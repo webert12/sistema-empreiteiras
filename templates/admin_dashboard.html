@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block title %}Painel ADM | Construtora Pro{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <!-- CABEÇALHO -->
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+
+        <div>
+            <span class="badge bg-danger-subtle text-danger px-3 py-2 mb-2">
+                <i class="bi bi-shield-lock me-1"></i>
+                Administração
+            </span>
+
+            <h1 class="fw-bold mb-1">
+                Painel Administrativo
+            </h1>
+
+            <p class="text-muted mb-0">
+                Controle geral da plataforma Construtora Pro.
+            </p>
+        </div>
+
+        <div>
+            <span class="badge bg-success-subtle text-success px-3 py-2">
+                <i class="bi bi-circle-fill me-1 small"></i>
+                Sistema operacional
+            </span>
+        </div>
+
+    </div>
+
+
+    <!-- INDICADORES -->
+    <div class="row g-4 mb-4">
+
+        <div class="col-12 col-md-6 col-xl-3">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between align-items-start">
+
+                        <div>
+                            <div class="text-muted small fw-semibold">
+                                EMPRESAS
+                            </div>
+
+                            <div class="display-6 fw-bold mt-2">
+                                {{ total_empresas }}
+                            </div>
+                        </div>
+
+                        <div class="bg-primary-subtle text-primary rounded-3 p-3">
+                            <i class="bi bi-buildings fs-4"></i>
+                        </div>
+
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        Empresas cadastradas
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-12 col-md-6 col-xl-3">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between align-items-start">
+
+                        <div>
+                            <div class="text-muted small fw-semibold">
+                                USUÁRIOS
+                            </div>
+
+                            <div class="display-6 fw-bold mt-2">
+                                {{ total_usuarios }}
+                            </div>
+                        </div>
+
+                        <div class="bg-success-subtle text-success rounded-3 p-3">
+                            <i class="bi bi-people fs-4"></i>
+                        </div>
+
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        Usuários da plataforma
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-12 col-md-6 col-xl-3">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between align-items-start">
+
+                        <div>
+                            <div class="text-muted small fw-semibold">
+                                OBRAS
+                            </div>
+
+                            <div class="display-6 fw-bold mt-2">
+                                {{ total_obras }}
+                            </div>
+                        </div>
+
+                        <div class="bg-warning-subtle text-warning rounded-3 p-3">
+                            <i class="bi bi-building fs-4"></i>
+                        </div>
+
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        Obras cadastradas
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-12 col-md-6 col-xl-3">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between align-items-start">
+
+                        <div>
+                            <div class="text-muted small fw-semibold">
+                                SOLICITAÇÕES
+                            </div>
+
+                            <div class="display-6 fw-bold mt-2">
+                                {{ total_solicitacoes }}
+                            </div>
+                        </div>
+
+                        <div class="bg-info-subtle text-info rounded-3 p-3">
+                            <i class="bi bi-clipboard-check fs-4"></i>
+                        </div>
+
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        Solicitações de materiais
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- EMPRESAS -->
+    <div class="card border-0 shadow-sm">
+
+        <div class="card-header bg-white border-0 p-4">
+
+            <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+
+                <div>
+                    <h5 class="fw-bold mb-1">
+                        Empresas cadastradas
+                    </h5>
+
+                    <p class="text-muted small mb-0">
+                        Visualize e gerencie as empreiteiras da plataforma.
+                    </p>
+                </div>
+
+                <button class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-2"></i>
+                    Nova empresa
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+            <table class="table align-middle mb-0">
+
+                <thead class="table-light">
+
+                    <tr>
+                        <th class="px-4">Empresa</th>
+                        <th>CNPJ</th>
+                        <th>Telefone</th>
+                        <th>Status</th>
+                        <th class="text-end px-4">Ações</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for empresa in empresas %}
+
+                    <tr>
+
+                        <td class="px-4">
+
+                            <div class="fw-semibold">
+                                {{ empresa.nome_fantasia or empresa.razao_social }}
+                            </div>
+
+                            {% if empresa.razao_social %}
+                            <div class="small text-muted">
+                                {{ empresa.razao_social }}
+                            </div>
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+                            {{ empresa.cnpj or "—" }}
+                        </td>
+
+
+                        <td>
+                            {{ empresa.telefone or "—" }}
+                        </td>
+
+
+                        <td>
+
+                            {% if empresa.ativo %}
+
+                                <span class="badge bg-success-subtle text-success">
+                                    Ativa
+                                </span>
+
+                            {% else %}
+
+                                <span class="badge bg-danger-subtle text-danger">
+                                    Inativa
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td class="text-end px-4">
+
+                            <button
+                                class="btn btn-sm btn-outline-primary"
+                                type="button">
+
+                                <i class="bi bi-eye me-1"></i>
+                                Visualizar
+
+                            </button>
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+
+                        <td colspan="5" class="text-center py-5">
+
+                            <div class="text-muted">
+
+                                <i class="bi bi-buildings fs-1 d-block mb-3"></i>
+
+                                <h6 class="fw-bold">
+                                    Nenhuma empresa cadastrada
+                                </h6>
+
+                                <p class="small mb-0">
+                                    As empresas cadastradas aparecerão aqui.
+                                </p>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
