@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}
+Novo administrador - Construtora Pro
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+
+        <div>
+
+            <div class="text-muted small mb-1">
+                <i class="bi bi-person-badge"></i>
+                Administração
+            </div>
+
+            <h2 class="fw-bold mb-1">
+                Novo administrador
+            </h2>
+
+            <p class="text-muted mb-0">
+                {{ empresa.nome_fantasia or empresa.razao_social }}
+            </p>
+
+        </div>
+
+        <a
+            href="{{ url_for('admin_empresa_detalhes', empresa_id=empresa.id) }}"
+            class="btn btn-outline-secondary"
+        >
+            <i class="bi bi-arrow-left"></i>
+            Voltar
+        </a>
+
+    </div>
+
+
+    <div class="row justify-content-center">
+
+        <div class="col-xl-7 col-lg-9">
+
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body p-4 p-lg-5">
+
+                    <div class="alert alert-info border-0">
+
+                        <div class="d-flex gap-3">
+
+                            <i class="bi bi-info-circle fs-4"></i>
+
+                            <div>
+
+                                <strong>Administrador da empresa</strong>
+
+                                <div class="small mt-1">
+                                    Esse usuário ficará vinculado exclusivamente à empresa
+                                    <strong>
+                                        {{ empresa.nome_fantasia or empresa.razao_social }}
+                                    </strong>
+                                    e poderá administrar a operação dela.
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <form method="POST">
+
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+                                Nome completo
+                            </label>
+
+                            <input
+                                type="text"
+                                name="nome"
+                                class="form-control form-control-lg"
+                                placeholder="Nome do administrador"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+                                Nome de usuário
+                            </label>
+
+                            <input
+                                type="text"
+                                name="usuario"
+                                class="form-control form-control-lg"
+                                placeholder="ex: joao.silva"
+                                minlength="3"
+                                required
+                            >
+
+                            <div class="form-text">
+                                Esse será o usuário utilizado no login.
+                            </div>
+
+                        </div>
+
+
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+                                Senha
+                            </label>
+
+                            <input
+                                type="password"
+                                name="senha"
+                                class="form-control form-control-lg"
+                                minlength="6"
+                                required
+                            >
+
+                            <div class="form-text">
+                                Mínimo de 6 caracteres.
+                            </div>
+
+                        </div>
+
+
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+                                Confirmar senha
+                            </label>
+
+                            <input
+                                type="password"
+                                name="confirmar_senha"
+                                class="form-control form-control-lg"
+                                minlength="6"
+                                required
+                            >
+
+                        </div>
+
+
+                        <hr class="my-4">
+
+
+                        <div class="d-flex flex-wrap justify-content-end gap-2">
+
+                            <a
+                                href="{{ url_for('admin_empresa_detalhes', empresa_id=empresa.id) }}"
+                                class="btn btn-outline-secondary px-4"
+                            >
+                                Cancelar
+                            </a>
+
+                            <button
+                                type="submit"
+                                class="btn btn-primary px-4"
+                            >
+                                <i class="bi bi-person-check"></i>
+                                Criar administrador
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
