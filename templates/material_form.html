@@ -1,0 +1,745 @@
+{% extends "base.html" %}
+
+{% block title %}Novo Material | Construtora Pro{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+        <span class="section-eyebrow">
+            <i class="bi bi-box-seam"></i>
+            GESTÃO DE MATERIAIS
+        </span>
+
+        <h1>Novo material</h1>
+
+        <p>
+            Cadastre um material no catálogo da empresa.
+        </p>
+    </div>
+
+    <div class="page-header-actions">
+
+        <a
+            href="{{ url_for('materiais') }}"
+            class="btn btn-light"
+        >
+            <i class="bi bi-arrow-left"></i>
+            Voltar para materiais
+        </a>
+
+    </div>
+
+</div>
+
+
+<div class="form-page-grid">
+
+    <!-- FORMULÁRIO -->
+
+    <div class="dashboard-panel">
+
+        <div class="panel-header">
+
+            <div>
+
+                <span class="panel-eyebrow">
+                    <i class="bi bi-box-seam"></i>
+                    CADASTRO
+                </span>
+
+                <h3>
+                    Dados do material
+                </h3>
+
+            </div>
+
+        </div>
+
+
+        <form
+            method="POST"
+            action="{{ url_for('novo_material') }}"
+            class="app-form"
+        >
+
+            <!-- IDENTIFICAÇÃO -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-box"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Identificação</h4>
+
+                        <p>
+                            Informe o nome e a categoria do material.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-12">
+
+                        <label
+                            for="nome"
+                            class="form-label"
+                        >
+                            Nome do material
+                            <span class="required">*</span>
+                        </label>
+
+                        <input
+                            type="text"
+                            id="nome"
+                            name="nome"
+                            class="form-control"
+                            placeholder="Ex.: Cimento CP II 50 kg"
+                            maxlength="150"
+                            required
+                            autofocus
+                        >
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label
+                            for="categoria"
+                            class="form-label"
+                        >
+                            Categoria
+                            <span class="required">*</span>
+                        </label>
+
+                        <select
+                            id="categoria"
+                            name="categoria"
+                            class="form-select"
+                            required
+                        >
+
+                            <option value="">
+                                Selecione uma categoria
+                            </option>
+
+                            <option value="Materiais básicos">
+                                Materiais básicos
+                            </option>
+
+                            <option value="Cimento e argamassa">
+                                Cimento e argamassa
+                            </option>
+
+                            <option value="Areia e agregados">
+                                Areia e agregados
+                            </option>
+
+                            <option value="Pedras e britas">
+                                Pedras e britas
+                            </option>
+
+                            <option value="Blocos e tijolos">
+                                Blocos e tijolos
+                            </option>
+
+                            <option value="Aço e ferragens">
+                                Aço e ferragens
+                            </option>
+
+                            <option value="Concreto">
+                                Concreto
+                            </option>
+
+                            <option value="Madeira">
+                                Madeira
+                            </option>
+
+                            <option value="Telhados e coberturas">
+                                Telhados e coberturas
+                            </option>
+
+                            <option value="Hidráulica">
+                                Hidráulica
+                            </option>
+
+                            <option value="Elétrica">
+                                Elétrica
+                            </option>
+
+                            <option value="Impermeabilização">
+                                Impermeabilização
+                            </option>
+
+                            <option value="Pisos e revestimentos">
+                                Pisos e revestimentos
+                            </option>
+
+                            <option value="Pintura">
+                                Pintura
+                            </option>
+
+                            <option value="Esquadrias">
+                                Esquadrias
+                            </option>
+
+                            <option value="Ferramentas">
+                                Ferramentas
+                            </option>
+
+                            <option value="EPI">
+                                EPI
+                            </option>
+
+                            <option value="Equipamentos">
+                                Equipamentos
+                            </option>
+
+                            <option value="Outros">
+                                Outros
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label
+                            for="unidade"
+                            class="form-label"
+                        >
+                            Unidade de medida
+                            <span class="required">*</span>
+                        </label>
+
+                        <select
+                            id="unidade"
+                            name="unidade"
+                            class="form-select"
+                            required
+                        >
+
+                            <option value="">
+                                Selecione a unidade
+                            </option>
+
+                            <option value="UN">
+                                UN — Unidade
+                            </option>
+
+                            <option value="KG">
+                                KG — Quilograma
+                            </option>
+
+                            <option value="G">
+                                G — Grama
+                            </option>
+
+                            <option value="T">
+                                T — Tonelada
+                            </option>
+
+                            <option value="M">
+                                M — Metro
+                            </option>
+
+                            <option value="M²">
+                                M² — Metro quadrado
+                            </option>
+
+                            <option value="M³">
+                                M³ — Metro cúbico
+                            </option>
+
+                            <option value="CM">
+                                CM — Centímetro
+                            </option>
+
+                            <option value="L">
+                                L — Litro
+                            </option>
+
+                            <option value="ML">
+                                ML — Mililitro
+                            </option>
+
+                            <option value="SACO">
+                                SACO
+                            </option>
+
+                            <option value="BARRA">
+                                BARRA
+                            </option>
+
+                            <option value="ROLO">
+                                ROLO
+                            </option>
+
+                            <option value="CAIXA">
+                                CAIXA
+                            </option>
+
+                            <option value="PACOTE">
+                                PACOTE
+                            </option>
+
+                            <option value="PAR">
+                                PAR
+                            </option>
+
+                            <option value="JOGO">
+                                JOGO
+                            </option>
+
+                            <option value="BALDE">
+                                BALDE
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ESTOQUE -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-boxes"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Controle inicial de estoque</h4>
+
+                        <p>
+                            Defina a quantidade inicial e o estoque mínimo.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+
+                        <label
+                            for="estoque_atual"
+                            class="form-label"
+                        >
+                            Estoque atual
+                        </label>
+
+                        <div class="input-group">
+
+                            <input
+                                type="number"
+                                id="estoque_atual"
+                                name="estoque_atual"
+                                class="form-control"
+                                value="0"
+                                min="0"
+                                step="0.01"
+                                inputmode="decimal"
+                            >
+
+                            <span class="input-group-text">
+                                unidade
+                            </span>
+
+                        </div>
+
+                        <div class="form-help">
+                            <i class="bi bi-info-circle"></i>
+                            Use 0 caso o material ainda não esteja em estoque.
+                        </div>
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label
+                            for="estoque_minimo"
+                            class="form-label"
+                        >
+                            Estoque mínimo
+                        </label>
+
+                        <div class="input-group">
+
+                            <input
+                                type="number"
+                                id="estoque_minimo"
+                                name="estoque_minimo"
+                                class="form-control"
+                                value="0"
+                                min="0"
+                                step="0.01"
+                                inputmode="decimal"
+                            >
+
+                            <span class="input-group-text">
+                                unidade
+                            </span>
+
+                        </div>
+
+                        <div class="form-help">
+                            <i class="bi bi-bell"></i>
+                            Será utilizado para identificar estoque baixo.
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- DESCRIÇÃO -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-card-text"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Descrição</h4>
+
+                        <p>
+                            Adicione informações complementares.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <label
+                    for="descricao"
+                    class="form-label"
+                >
+                    Descrição do material
+                </label>
+
+                <textarea
+                    id="descricao"
+                    name="descricao"
+                    class="form-control"
+                    rows="5"
+                    maxlength="1000"
+                    placeholder="Ex.: Cimento Portland CP II-E-32, saco de 50 kg..."
+                ></textarea>
+
+                <div class="form-help">
+                    <i class="bi bi-info-circle"></i>
+                    Campo opcional.
+                </div>
+
+            </div>
+
+
+            <!-- STATUS -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-toggle-on"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Status</h4>
+
+                        <p>
+                            Controle se o material pode ser utilizado nas solicitações.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="material-active-option">
+
+                    <label class="material-checkbox">
+
+                        <input
+                            type="checkbox"
+                            id="ativo"
+                            name="ativo"
+                            value="1"
+                            checked
+                        >
+
+                        <span class="material-checkbox-box">
+                            <i class="bi bi-check-lg"></i>
+                        </span>
+
+                        <span class="material-checkbox-content">
+
+                            <strong>
+                                Material ativo
+                            </strong>
+
+                            <small>
+                                Permitir que este material seja utilizado
+                                nas solicitações de materiais.
+                            </small>
+
+                        </span>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+
+            <!-- AÇÕES -->
+
+            <div class="form-actions">
+
+                <a
+                    href="{{ url_for('materiais') }}"
+                    class="btn btn-light"
+                >
+                    <i class="bi bi-x-lg"></i>
+                    Cancelar
+                </a>
+
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    <i class="bi bi-check-lg"></i>
+                    Cadastrar material
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- LATERAL -->
+
+    <div class="dashboard-panel form-side-panel">
+
+        <div class="panel-header">
+
+            <div>
+
+                <span class="panel-eyebrow">
+                    <i class="bi bi-lightbulb"></i>
+                    ORGANIZAÇÃO
+                </span>
+
+                <h3>
+                    Dicas de cadastro
+                </h3>
+
+            </div>
+
+        </div>
+
+
+        <div class="form-tips">
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-tag"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Use nomes claros
+                    </strong>
+
+                    <p>
+                        Informe marca, modelo, medida ou característica
+                        quando isso ajudar a diferenciar materiais.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-rulers"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Escolha a unidade correta
+                    </strong>
+
+                    <p>
+                        A unidade será usada nas solicitações,
+                        entradas, saídas e movimentações futuras.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Configure o estoque mínimo
+                    </strong>
+
+                    <p>
+                        Isso permitirá identificar materiais que
+                        precisam de reposição.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-diagram-3"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Organize por categoria
+                    </strong>
+
+                    <p>
+                        Categorias facilitam a localização dos materiais
+                        e a criação de relatórios.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="form-security-note">
+
+            <i class="bi bi-shield-check"></i>
+
+            <div>
+
+                <strong>
+                    Sem preços neste cadastro
+                </strong>
+
+                <span>
+                    Valores serão tratados posteriormente no módulo
+                    de compras e recebimento.
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const unidade =
+        document.getElementById("unidade");
+
+    const unidadeLabels = {
+        "UN": "unidade",
+        "KG": "kg",
+        "G": "g",
+        "T": "tonelada",
+        "M": "metro",
+        "M²": "m²",
+        "M³": "m³",
+        "CM": "cm",
+        "L": "litro",
+        "ML": "ml",
+        "SACO": "saco",
+        "BARRA": "barra",
+        "ROLO": "rolo",
+        "CAIXA": "caixa",
+        "PACOTE": "pacote",
+        "PAR": "par",
+        "JOGO": "jogo",
+        "BALDE": "balde"
+    };
+
+
+    unidade.addEventListener("change", function () {
+
+        const label =
+            unidadeLabels[unidade.value] || "unidade";
+
+        document.querySelectorAll(
+            ".input-group-text"
+        ).forEach(function (element) {
+
+            element.textContent = label;
+
+        });
+
+    });
+
+});
+
+</script>
+
+{% endblock %}
