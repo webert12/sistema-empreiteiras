@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitações | Construtora Pro{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+        <span class="section-eyebrow">
+            <i class="bi bi-clipboard-check"></i>
+            GESTÃO DE MATERIAIS
+        </span>
+
+        <h1>Solicitações</h1>
+
+        <p>
+            Acompanhe as solicitações de materiais das obras.
+        </p>
+    </div>
+
+    <div class="page-header-actions">
+
+        <a
+            href="{{ url_for('nova_solicitacao') }}"
+            class="btn btn-primary"
+        >
+            <i class="bi bi-plus-lg"></i>
+            Nova solicitação
+        </a>
+
+    </div>
+
+</div>
+
+
+<!-- INDICADORES -->
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+
+        <div class="stat-icon">
+            <i class="bi bi-clipboard-data"></i>
+        </div>
+
+        <div class="stat-content">
+
+            <span class="stat-label">
+                Total
+            </span>
+
+            <strong>
+                {{ solicitacoes|length }}
+            </strong>
+
+            <small>
+                <i class="bi bi-list-check"></i>
+                solicitações
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <div class="stat-icon">
+            <i class="bi bi-hourglass-split"></i>
+        </div>
+
+        <div class="stat-content">
+
+            <span class="stat-label">
+                Pendentes
+            </span>
+
+            <strong>
+                {{
+                    solicitacoes
+                    |selectattr('status', 'equalto', 'Pendente')
+                    |list
+                    |length
+                }}
+            </strong>
+
+            <small>
+                <i class="bi bi-clock"></i>
+                aguardando análise
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <div class="stat-icon">
+            <i class="bi bi-check-circle"></i>
+        </div>
+
+        <div class="stat-content">
+
+            <span class="stat-label">
+                Aprovadas
+            </span>
+
+            <strong>
+                {{
+                    solicitacoes
+                    |selectattr('status', 'equalto', 'Aprovada')
+                    |list
+                    |length
+                }}
+            </strong>
+
+            <small>
+                <i class="bi bi-check2"></i>
+                liberadas para compra
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <div class="stat-icon">
+            <i class="bi bi-truck"></i>
+        </div>
+
+        <div class="stat-content">
+
+            <span class="stat-label">
+                Compradas
+            </span>
+
+            <strong>
+                {{
+                    solicitacoes
+                    |selectattr('status', 'equalto', 'Comprada')
+                    |list
+                    |length
+                }}
+            </strong>
+
+            <small>
+                <i class="bi bi-cart-check"></i>
+                aguardando recebimento
+            </small>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- LISTAGEM -->
+
+<div class="dashboard-panel">
+
+    <div class="panel-header">
+
+        <div>
+
+            <span class="panel-eyebrow">
+                <i class="bi bi-list-check"></i>
+                SOLICITAÇÕES
+            </span>
+
+            <h3>
+                Solicitações de materiais
+            </h3>
+
+        </div>
+
+        {% if solicitacoes %}
+
+        <span class="panel-count">
+
+            {{ solicitacoes|length }}
+
+            {% if solicitacoes|length == 1 %}
+                solicitação
+            {% else %}
+                solicitações
+            {% endif %}
+
+        </span>
+
+        {% endif %}
+
+    </div>
+
+
+    {% if solicitacoes %}
+
+    <!-- FILTROS -->
+
+    <div class="request-filters">
+
+        <div class="request-search">
+
+            <i class="bi bi-search"></i>
+
+            <input
+                type="search"
+                id="requestSearch"
+                class="form-control"
+                placeholder="Buscar por obra, material ou solicitante..."
+                autocomplete="off"
+            >
+
+        </div>
+
+
+        <div class="request-status-filter">
+
+            <select
+                id="requestStatus"
+                class="form-select"
+            >
+
+                <option value="">
+                    Todos os status
+                </option>
+
+                <option value="Pendente">
+                    Pendentes
+                </option>
+
+                <option value="Aprovada">
+                    Aprovadas
+                </option>
+
+                <option value="Rejeitada">
+                    Rejeitadas
+                </option>
+
+                <option value="Comprada">
+                    Compradas
+                </option>
+
+                <option value="Recebida">
+                    Recebidas
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+
+    <!-- TABELA -->
+
+    <div class="table-responsive">
+
+        <table
+            class="table app-table align-middle"
+            id="requestsTable"
+        >
+
+            <thead>
+
+                <tr>
+
+                    <th>Material</th>
+
+                    <th>Obra</th>
+
+                    <th>Quantidade</th>
+
+                    <th>Solicitante</th>
+
+                    <th>Data</th>
+
+                    <th>Status</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for solicitacao in solicitacoes %}
+
+                <tr
+                    class="request-row"
+                    data-search="
+                        {{ solicitacao.material.nome|default('')|lower }}
+                        {{ solicitacao.obra.nome|default('')|lower }}
+                        {{ solicitacao.usuario.nome|default('')|lower }}
+                    "
+                    data-status="{{ solicitacao.status|default('Pendente') }}"
+                >
+
+                    <!-- MATERIAL -->
+
+                    <td>
+
+                        <div class="table-primary-info">
+
+                            <div class="table-avatar">
+                                <i class="bi bi-box-seam"></i>
+                            </div>
+
+                            <div>
+
+                                <strong>
+                                    {{ solicitacao.material.nome }}
+                                </strong>
+
+                                {% if solicitacao.material.categoria %}
+
+                                <span>
+                                    {{ solicitacao.material.categoria }}
+                                </span>
+
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+                    </td>
+
+
+                    <!-- OBRA -->
+
+                    <td>
+
+                        <div class="table-secondary-info">
+
+                            <i class="bi bi-building"></i>
+
+                            <span>
+                                {{ solicitacao.obra.nome }}
+                            </span>
+
+                        </div>
+
+                    </td>
+
+
+                    <!-- QUANTIDADE -->
+
+                    <td>
+
+                        <div class="quantity-cell">
+
+                            <strong>
+                                {{ solicitacao.quantidade }}
+                            </strong>
+
+                            <span>
+                                {{ solicitacao.material.unidade }}
+                            </span>
+
+                        </div>
+
+                    </td>
+
+
+                    <!-- SOLICITANTE -->
+
+                    <td>
+
+                        {% if solicitacao.usuario %}
+
+                        <div class="table-secondary-info">
+
+                            <i class="bi bi-person"></i>
+
+                            <span>
+                                {{ solicitacao.usuario.nome }}
+                            </span>
+
+                        </div>
+
+                        {% else %}
+
+                        <span class="text-muted">
+                            Não informado
+                        </span>
+
+                        {% endif %}
+
+                    </td>
+
+
+                    <!-- DATA -->
+
+                    <td>
+
+                        {% if solicitacao.criado_em %}
+
+                        <span class="date-cell">
+
+                            <i class="bi bi-calendar-event"></i>
+
+                            {{ solicitacao.criado_em.strftime('%d/%m/%Y') }}
+
+                        </span>
+
+                        {% else %}
+
+                        <span class="text-muted">
+                            —
+                        </span>
+
+                        {% endif %}
+
+                    </td>
+
+
+                    <!-- STATUS -->
+
+                    <td>
+
+                        {% if solicitacao.status == 'Aprovada' %}
+
+                        <span class="status-badge status-success">
+                            <i class="bi bi-check-circle-fill"></i>
+                            Aprovada
+                        </span>
+
+                        {% elif solicitacao.status == 'Rejeitada' %}
+
+                        <span class="status-badge status-danger">
+                            <i class="bi bi-x-circle-fill"></i>
+                            Rejeitada
+                        </span>
+
+                        {% elif solicitacao.status == 'Comprada' %}
+
+                        <span class="status-badge status-info">
+                            <i class="bi bi-cart-check-fill"></i>
+                            Comprada
+                        </span>
+
+                        {% elif solicitacao.status == 'Recebida' %}
+
+                        <span class="status-badge status-success">
+                            <i class="bi bi-box2-heart-fill"></i>
+                            Recebida
+                        </span>
+
+                        {% else %}
+
+                        <span class="status-badge status-warning">
+                            <i class="bi bi-hourglass-split"></i>
+                            {{ solicitacao.status or 'Pendente' }}
+                        </span>
+
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- SEM RESULTADO -->
+
+    <div
+        id="requestSearchEmpty"
+        class="empty-state"
+        style="display:none;"
+    >
+
+        <div class="empty-state-icon">
+            <i class="bi bi-search"></i>
+        </div>
+
+        <h4>
+            Nenhuma solicitação encontrada
+        </h4>
+
+        <p>
+            Tente alterar os filtros ou realizar outra busca.
+        </p>
+
+    </div>
+
+
+    {% else %}
+
+    <!-- ESTADO VAZIO -->
+
+    <div class="empty-state">
+
+        <div class="empty-state-icon">
+            <i class="bi bi-clipboard"></i>
+        </div>
+
+        <h4>
+            Nenhuma solicitação cadastrada
+        </h4>
+
+        <p>
+            Crie uma solicitação para pedir materiais
+            para uma das obras.
+        </p>
+
+        <a
+            href="{{ url_for('nova_solicitacao') }}"
+            class="btn btn-primary"
+        >
+            <i class="bi bi-plus-lg"></i>
+            Criar primeira solicitação
+        </a>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+
+<!-- FLUXO -->
+
+<div class="dashboard-info-banner">
+
+    <div class="dashboard-info-icon">
+        <i class="bi bi-diagram-3"></i>
+    </div>
+
+    <div>
+
+        <strong>
+            Fluxo de materiais
+        </strong>
+
+        <p>
+            A solicitação será a primeira etapa do fluxo:
+            solicitação → aprovação → compra → recebimento →
+            entrada no estoque → utilização na obra.
+        </p>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const searchInput =
+        document.getElementById("requestSearch");
+
+    const statusFilter =
+        document.getElementById("requestStatus");
+
+    const rows =
+        document.querySelectorAll(".request-row");
+
+    const empty =
+        document.getElementById("requestSearchEmpty");
+
+
+    function filterRequests() {
+
+        const search =
+            searchInput
+                ? searchInput.value.toLowerCase().trim()
+                : "";
+
+        const status =
+            statusFilter
+                ? statusFilter.value
+                : "";
+
+        let visibleRows = 0;
+
+
+        rows.forEach(function (row) {
+
+            const content =
+                row.dataset.search
+                    .toLowerCase();
+
+            const rowStatus =
+                row.dataset.status;
+
+
+            const matchesSearch =
+                !search ||
+                content.includes(search);
+
+
+            const matchesStatus =
+                !status ||
+                rowStatus === status;
+
+
+            if (
+                matchesSearch &&
+                matchesStatus
+            ) {
+
+                row.style.display = "";
+                visibleRows++;
+
+            } else {
+
+                row.style.display = "none";
+
+            }
+
+        });
+
+
+        if (empty) {
+
+            empty.style.display =
+                visibleRows === 0
+                ? "block"
+                : "none";
+
+        }
+
+    }
+
+
+    if (searchInput) {
+
+        searchInput.addEventListener(
+            "input",
+            filterRequests
+        );
+
+    }
+
+
+    if (statusFilter) {
+
+        statusFilter.addEventListener(
+            "change",
+            filterRequests
+        );
+
+    }
+
+});
+
+</script>
+
+{% endblock %}
