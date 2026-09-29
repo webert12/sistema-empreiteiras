@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Construtora Pro{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-page">
+
+    <!-- CABEÇALHO -->
+    <div class="dashboard-welcome">
+        <div>
+            <span class="dashboard-eyebrow">
+                <i class="bi bi-speedometer2"></i>
+                PAINEL DE CONTROLE
+            </span>
+
+            <h1>
+                Olá, {{ usuario_logado.nome }}
+            </h1>
+
+            <p>
+                Acompanhe as principais informações da sua empresa e das obras.
+            </p>
+        </div>
+
+        <div class="dashboard-date">
+            <i class="bi bi-calendar3"></i>
+            <span id="currentDate"></span>
+        </div>
+    </div>
+
+
+    <!-- INDICADORES -->
+    <div class="stats-grid">
+
+        <!-- OBRAS -->
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-buildings"></i>
+            </div>
+
+            <div class="stat-content">
+                <span class="stat-label">Obras</span>
+                <strong>{{ obras|length }}</strong>
+                <small>
+                    <i class="bi bi-building-check"></i>
+                    cadastradas
+                </small>
+            </div>
+        </div>
+
+
+        <!-- MATERIAIS -->
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+
+            <div class="stat-content">
+                <span class="stat-label">Materiais</span>
+                <strong>{{ materiais|length }}</strong>
+                <small>
+                    <i class="bi bi-boxes"></i>
+                    disponíveis no catálogo
+                </small>
+            </div>
+        </div>
+
+
+        <!-- SOLICITAÇÕES -->
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-clipboard-check"></i>
+            </div>
+
+            <div class="stat-content">
+                <span class="stat-label">Solicitações</span>
+                <strong>{{ solicitacoes|length }}</strong>
+                <small>
+                    <i class="bi bi-list-check"></i>
+                    registradas
+                </small>
+            </div>
+        </div>
+
+
+        <!-- EMPRESA -->
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-building-fill-check"></i>
+            </div>
+
+            <div class="stat-content">
+                <span class="stat-label">Empresa</span>
+                <strong class="stat-company">
+                    {{ usuario_logado.empresa.nome_fantasia if usuario_logado.empresa else 'Empresa' }}
+                </strong>
+                <small>
+                    <i class="bi bi-shield-check"></i>
+                    ambiente ativo
+                </small>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- AÇÕES RÁPIDAS -->
+    <div class="section-header">
+        <div>
+            <span class="section-eyebrow">
+                <i class="bi bi-lightning-charge"></i>
+                ACESSO RÁPIDO
+            </span>
+
+            <h2>Ações rápidas</h2>
+        </div>
+    </div>
+
+
+    <div class="quick-actions-grid">
+
+        <a href="{{ url_for('nova_obra') }}" class="quick-action-card">
+            <div class="quick-action-icon">
+                <i class="bi bi-building-add"></i>
+            </div>
+
+            <div>
+                <strong>Nova obra</strong>
+                <span>Cadastrar uma nova obra</span>
+            </div>
+
+            <i class="bi bi-arrow-right quick-action-arrow"></i>
+        </a>
+
+
+        <a href="{{ url_for('novo_material') }}" class="quick-action-card">
+            <div class="quick-action-icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+
+            <div>
+                <strong>Novo material</strong>
+                <span>Adicionar ao catálogo</span>
+            </div>
+
+            <i class="bi bi-arrow-right quick-action-arrow"></i>
+        </a>
+
+
+        <a href="{{ url_for('nova_solicitacao') }}" class="quick-action-card">
+            <div class="quick-action-icon">
+                <i class="bi bi-clipboard-plus"></i>
+            </div>
+
+            <div>
+                <strong>Nova solicitação</strong>
+                <span>Solicitar material para obra</span>
+            </div>
+
+            <i class="bi bi-arrow-right quick-action-arrow"></i>
+        </a>
+
+    </div>
+
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div class="dashboard-columns">
+
+        <!-- OBRAS RECENTES -->
+        <div class="dashboard-panel">
+
+            <div class="panel-header">
+                <div>
+                    <span class="panel-eyebrow">
+                        <i class="bi bi-buildings"></i>
+                        OBRAS
+                    </span>
+
+                    <h3>Obras cadastradas</h3>
+                </div>
+
+                <a href="{{ url_for('obras') }}" class="panel-link">
+                    Ver todas
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+
+            {% if obras %}
+
+                <div class="dashboard-list">
+
+                    {% for obra in obras[:5] %}
+
+                    <div class="dashboard-list-item">
+
+                        <div class="list-item-icon">
+                            <i class="bi bi-building"></i>
+                        </div>
+
+                        <div class="list-item-content">
+
+                            <strong>
+                                {{ obra.nome }}
+                            </strong>
+
+                            <span>
+                                {% if obra.cliente %}
+                                    {{ obra.cliente }}
+                                {% else %}
+                                    Cliente não informado
+                                {% endif %}
+                            </span>
+
+                        </div>
+
+                        <div class="list-item-status">
+
+                            {% if obra.status == 'Em andamento' %}
+                                <span class="status-badge status-success">
+                                    Em andamento
+                                </span>
+
+                            {% elif obra.status == 'Concluída' %}
+                                <span class="status-badge status-info">
+                                    Concluída
+                                </span>
+
+                            {% elif obra.status == 'Pausada' %}
+                                <span class="status-badge status-warning">
+                                    Pausada
+                                </span>
+
+                            {% else %}
+                                <span class="status-badge status-secondary">
+                                    {{ obra.status or 'Planejamento' }}
+                                </span>
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+
+                <div class="empty-state">
+
+                    <div class="empty-state-icon">
+                        <i class="bi bi-building"></i>
+                    </div>
+
+                    <h4>Nenhuma obra cadastrada</h4>
+
+                    <p>
+                        Comece cadastrando a primeira obra da empresa.
+                    </p>
+
+                    <a href="{{ url_for('nova_obra') }}"
+                       class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i>
+                        Cadastrar obra
+                    </a>
+
+                </div>
+
+            {% endif %}
+
+        </div>
+
+
+        <!-- SOLICITAÇÕES -->
+        <div class="dashboard-panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <span class="panel-eyebrow">
+                        <i class="bi bi-clipboard-check"></i>
+                        MATERIAIS
+                    </span>
+
+                    <h3>Solicitações recentes</h3>
+                </div>
+
+                <a href="{{ url_for('solicitacoes') }}" class="panel-link">
+                    Ver todas
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+
+            </div>
+
+
+            {% if solicitacoes %}
+
+                <div class="dashboard-list">
+
+                    {% for solicitacao in solicitacoes[:5] %}
+
+                    <div class="dashboard-list-item">
+
+                        <div class="list-item-icon">
+                            <i class="bi bi-box-seam"></i>
+                        </div>
+
+
+                        <div class="list-item-content">
+
+                            <strong>
+                                {{ solicitacao.material.nome }}
+                            </strong>
+
+                            <span>
+                                {{ solicitacao.obra.nome }}
+                                ·
+                                {{ solicitacao.quantidade }}
+                                {{ solicitacao.material.unidade }}
+                            </span>
+
+                        </div>
+
+
+                        <div class="list-item-status">
+
+                            {% if solicitacao.status == 'Aprovada' %}
+
+                                <span class="status-badge status-success">
+                                    Aprovada
+                                </span>
+
+                            {% elif solicitacao.status == 'Rejeitada' %}
+
+                                <span class="status-badge status-danger">
+                                    Rejeitada
+                                </span>
+
+                            {% elif solicitacao.status == 'Comprada' %}
+
+                                <span class="status-badge status-info">
+                                    Comprada
+                                </span>
+
+                            {% elif solicitacao.status == 'Recebida' %}
+
+                                <span class="status-badge status-success">
+                                    Recebida
+                                </span>
+
+                            {% else %}
+
+                                <span class="status-badge status-warning">
+                                    {{ solicitacao.status or 'Pendente' }}
+                                </span>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+
+                <div class="empty-state">
+
+                    <div class="empty-state-icon">
+                        <i class="bi bi-clipboard"></i>
+                    </div>
+
+                    <h4>Nenhuma solicitação</h4>
+
+                    <p>
+                        Ainda não existem solicitações de materiais.
+                    </p>
+
+                    <a href="{{ url_for('nova_solicitacao') }}"
+                       class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i>
+                        Nova solicitação
+                    </a>
+
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- RODAPÉ DO DASHBOARD -->
+    <div class="dashboard-info-banner">
+
+        <div class="dashboard-info-icon">
+            <i class="bi bi-info-circle"></i>
+        </div>
+
+        <div>
+            <strong>Construtora Pro</strong>
+
+            <p>
+                Centralize o gerenciamento das suas obras,
+                materiais e solicitações em um único sistema.
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const dateElement = document.getElementById("currentDate");
+
+    if (dateElement) {
+
+        const now = new Date();
+
+        const formattedDate = now.toLocaleDateString("pt-BR", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric"
+        });
+
+        dateElement.textContent =
+            formattedDate.charAt(0).toUpperCase() +
+            formattedDate.slice(1);
+    }
+
+});
+</script>
+
+{% endblock %}
