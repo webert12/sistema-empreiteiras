@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ empresa.nome_fantasia or empresa.razao_social }} - Construtora Pro
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+
+        <div>
+
+            <div class="text-muted small mb-1">
+                <i class="bi bi-building"></i>
+                Administração / Empresas
+            </div>
+
+            <h2 class="fw-bold mb-1">
+                {{ empresa.nome_fantasia or empresa.razao_social }}
+            </h2>
+
+            <p class="text-muted mb-0">
+                Gerenciamento da empresa
+            </p>
+
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+
+            <a
+                href="{{ url_for('admin') }}"
+                class="btn btn-outline-secondary"
+            >
+                <i class="bi bi-arrow-left"></i>
+                Empresas
+            </a>
+
+            <a
+                href="{{ url_for('admin_editar_empresa', empresa_id=empresa.id) }}"
+                class="btn btn-primary"
+            >
+                <i class="bi bi-pencil"></i>
+                Editar
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- STATUS -->
+
+    <div class="card border-0 shadow-sm mb-4">
+
+        <div class="card-body">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+
+                <div>
+
+                    <div class="text-muted small">
+                        Status da empresa
+                    </div>
+
+                    {% if empresa.ativo %}
+
+                        <span class="badge bg-success-subtle text-success fs-6 mt-1">
+                            <i class="bi bi-check-circle"></i>
+                            Empresa ativa
+                        </span>
+
+                    {% else %}
+
+                        <span class="badge bg-danger-subtle text-danger fs-6 mt-1">
+                            <i class="bi bi-x-circle"></i>
+                            Empresa desativada
+                        </span>
+
+                    {% endif %}
+
+                </div>
+
+
+                <form
+                    method="POST"
+                    action="{{ url_for('admin_alternar_empresa', empresa_id=empresa.id) }}"
+                >
+
+                    {% if empresa.ativo %}
+
+                    <button
+                        type="submit"
+                        class="btn btn-outline-danger"
+                        onclick="return confirm('Deseja realmente desativar esta empresa?')"
+                    >
+                        <i class="bi bi-pause-circle"></i>
+                        Desativar empresa
+                    </button>
+
+                    {% else %}
+
+                    <button
+                        type="submit"
+                        class="btn btn-outline-success"
+                    >
+                        <i class="bi bi-play-circle"></i>
+                        Ativar empresa
+                    </button>
+
+                    {% endif %}
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- INDICADORES -->
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body">
+
+                    <div class="text-muted small">
+                        Usuários
+                    </div>
+
+                    <div class="fs-2 fw-bold">
+                        {{ total_usuarios }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body">
+
+                    <div class="text-muted small">
+                        Obras
+                    </div>
+
+                    <div class="fs-2 fw-bold">
+                        {{ total_obras }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body">
+
+                    <div class="text-muted small">
+                        Solicitações
+                    </div>
+
+                    <div class="fs-2 fw-bold">
+                        {{ total_solicitacoes }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="row g-4">
+
+        <!-- DADOS -->
+
+        <div class="col-lg-7">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-header bg-transparent border-0 pt-4 px-4">
+
+                    <h5 class="fw-bold mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        Dados da empresa
+                    </h5>
+
+                </div>
+
+                <div class="card-body px-4">
+
+                    <div class="row g-4">
+
+                        <div class="col-md-6">
+
+                            <div class="text-muted small">
+                                Razão Social
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ empresa.razao_social or "Não informado" }}
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-6">
+
+                            <div class="text-muted small">
+                                Nome Fantasia
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ empresa.nome_fantasia or "Não informado" }}
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-6">
+
+                            <div class="text-muted small">
+                                CNPJ
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ empresa.cnpj or "Não informado" }}
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-6">
+
+                            <div class="text-muted small">
+                                Telefone
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ empresa.telefone or "Não informado" }}
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-6">
+
+                            <div class="text-muted small">
+                                E-mail
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ empresa.email or "Não informado" }}
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-6">
+
+                            <div class="text-muted small">
+                                Endereço
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ empresa.endereco or "Não informado" }}
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ADMINISTRADORES -->
+
+        <div class="col-lg-5">
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-header bg-transparent border-0 pt-4 px-4">
+
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-person-badge"></i>
+                            Administradores
+                        </h5>
+
+                        {% if empresa.ativo %}
+
+                        <a
+                            href="{{ url_for('admin_novo_usuario_empresa', empresa_id=empresa.id) }}"
+                            class="btn btn-sm btn-primary"
+                        >
+                            <i class="bi bi-plus-lg"></i>
+                            Novo
+                        </a>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+
+                <div class="card-body px-4">
+
+                    {% if administradores %}
+
+                        <div class="list-group list-group-flush">
+
+                            {% for administrador in administradores %}
+
+                            <div class="list-group-item px-0">
+
+                                <div class="fw-semibold">
+                                    {{ administrador.nome }}
+                                </div>
+
+                                <div class="small text-muted">
+                                    @{{ administrador.usuario }}
+                                </div>
+
+                                {% if administrador.ativo %}
+
+                                <span class="badge bg-success-subtle text-success mt-1">
+                                    Ativo
+                                </span>
+
+                                {% else %}
+
+                                <span class="badge bg-danger-subtle text-danger mt-1">
+                                    Inativo
+                                </span>
+
+                                {% endif %}
+
+                            </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% else %}
+
+                        <div class="text-center py-4">
+
+                            <i class="bi bi-person-plus fs-1 text-muted"></i>
+
+                            <p class="text-muted mt-3 mb-3">
+                                Nenhum administrador foi cadastrado para esta empresa.
+                            </p>
+
+                            {% if empresa.ativo %}
+
+                            <a
+                                href="{{ url_for('admin_novo_usuario_empresa', empresa_id=empresa.id) }}"
+                                class="btn btn-primary"
+                            >
+                                Criar administrador
+                            </a>
+
+                            {% endif %}
+
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
