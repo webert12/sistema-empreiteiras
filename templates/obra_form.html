@@ -1,0 +1,579 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Obra | Construtora Pro{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+        <span class="section-eyebrow">
+            <i class="bi bi-building-add"></i>
+            GESTÃO DE OBRAS
+        </span>
+
+        <h1>Nova obra</h1>
+
+        <p>
+            Cadastre as informações principais da obra.
+        </p>
+    </div>
+
+    <div class="page-header-actions">
+
+        <a href="{{ url_for('obras') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i>
+            Voltar para obras
+        </a>
+
+    </div>
+
+</div>
+
+
+<div class="form-page-grid">
+
+    <!-- FORMULÁRIO PRINCIPAL -->
+
+    <div class="dashboard-panel">
+
+        <div class="panel-header">
+
+            <div>
+
+                <span class="panel-eyebrow">
+                    <i class="bi bi-file-earmark-text"></i>
+                    DADOS DA OBRA
+                </span>
+
+                <h3>
+                    Informações gerais
+                </h3>
+
+            </div>
+
+        </div>
+
+
+        <form
+            method="POST"
+            action="{{ url_for('nova_obra') }}"
+            class="app-form"
+        >
+
+            <!-- IDENTIFICAÇÃO -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-building"></i>
+                    </div>
+
+                    <div>
+                        <h4>Identificação</h4>
+
+                        <p>
+                            Informe os dados básicos da obra.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-12">
+
+                        <label for="nome" class="form-label">
+                            Nome da obra
+                            <span class="required">*</span>
+                        </label>
+
+                        <input
+                            type="text"
+                            id="nome"
+                            name="nome"
+                            class="form-control"
+                            placeholder="Ex.: Residencial Jardim das Flores"
+                            maxlength="150"
+                            required
+                            autofocus
+                        >
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label for="cliente" class="form-label">
+                            Cliente
+                        </label>
+
+                        <input
+                            type="text"
+                            id="cliente"
+                            name="cliente"
+                            class="form-control"
+                            placeholder="Nome do cliente"
+                            maxlength="150"
+                        >
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label for="responsavel" class="form-label">
+                            Responsável pela obra
+                        </label>
+
+                        <input
+                            type="text"
+                            id="responsavel"
+                            name="responsavel"
+                            class="form-control"
+                            placeholder="Engenheiro, mestre ou responsável"
+                            maxlength="150"
+                        >
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- LOCALIZAÇÃO -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-geo-alt"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Localização</h4>
+
+                        <p>
+                            Informe onde a obra está localizada.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-12">
+
+                        <label for="endereco" class="form-label">
+                            Endereço da obra
+                        </label>
+
+                        <input
+                            type="text"
+                            id="endereco"
+                            name="endereco"
+                            class="form-control"
+                            placeholder="Rua, número, bairro, cidade - UF"
+                            maxlength="300"
+                        >
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- CRONOGRAMA -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-calendar3"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Cronograma</h4>
+
+                        <p>
+                            Defina o período previsto da obra.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+
+                        <label for="data_inicio" class="form-label">
+                            Data de início
+                        </label>
+
+                        <input
+                            type="date"
+                            id="data_inicio"
+                            name="data_inicio"
+                            class="form-control"
+                        >
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label for="previsao_termino" class="form-label">
+                            Previsão de término
+                        </label>
+
+                        <input
+                            type="date"
+                            id="previsao_termino"
+                            name="previsao_termino"
+                            class="form-control"
+                        >
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- STATUS -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-activity"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Status da obra</h4>
+
+                        <p>
+                            Defina a situação atual da construção.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+
+                        <label for="status" class="form-label">
+                            Status
+                        </label>
+
+                        <select
+                            id="status"
+                            name="status"
+                            class="form-select"
+                        >
+
+                            <option value="Planejamento">
+                                Planejamento
+                            </option>
+
+                            <option value="Em andamento">
+                                Em andamento
+                            </option>
+
+                            <option value="Pausada">
+                                Pausada
+                            </option>
+
+                            <option value="Concluída">
+                                Concluída
+                            </option>
+
+                            <option value="Cancelada">
+                                Cancelada
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- OBSERVAÇÕES -->
+
+            <div class="form-section">
+
+                <div class="form-section-title">
+
+                    <div class="form-section-icon">
+                        <i class="bi bi-chat-left-text"></i>
+                    </div>
+
+                    <div>
+
+                        <h4>Observações</h4>
+
+                        <p>
+                            Adicione informações importantes sobre a obra.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div>
+
+                    <label for="observacoes" class="form-label">
+                        Observações
+                    </label>
+
+                    <textarea
+                        id="observacoes"
+                        name="observacoes"
+                        class="form-control"
+                        rows="5"
+                        maxlength="2000"
+                        placeholder="Informações adicionais, características da obra, observações do contrato, etc."
+                    ></textarea>
+
+                    <div class="form-help">
+                        <i class="bi bi-info-circle"></i>
+                        Campo opcional.
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- AÇÕES -->
+
+            <div class="form-actions">
+
+                <a
+                    href="{{ url_for('obras') }}"
+                    class="btn btn-light"
+                >
+                    <i class="bi bi-x-lg"></i>
+                    Cancelar
+                </a>
+
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    <i class="bi bi-check-lg"></i>
+                    Cadastrar obra
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- LATERAL INFORMATIVA -->
+
+    <div class="dashboard-panel form-side-panel">
+
+        <div class="panel-header">
+
+            <div>
+
+                <span class="panel-eyebrow">
+                    <i class="bi bi-lightbulb"></i>
+                    DICAS
+                </span>
+
+                <h3>
+                    Cadastro da obra
+                </h3>
+
+            </div>
+
+        </div>
+
+
+        <div class="form-tips">
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-building"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Identifique bem a obra
+                    </strong>
+
+                    <p>
+                        Use um nome fácil de reconhecer,
+                        principalmente quando a empresa possuir
+                        várias obras simultaneamente.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Mantenha as datas atualizadas
+                    </strong>
+
+                    <p>
+                        As datas serão utilizadas futuramente
+                        no acompanhamento do cronograma.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Materiais por obra
+                    </strong>
+
+                    <p>
+                        Depois do cadastro, será possível
+                        relacionar solicitações e materiais
+                        diretamente à obra.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-tip">
+
+                <div class="form-tip-icon">
+                    <i class="bi bi-people"></i>
+                </div>
+
+                <div>
+
+                    <strong>
+                        Equipe e responsáveis
+                    </strong>
+
+                    <p>
+                        A estrutura do sistema será expandida
+                        para controlar equipes e responsáveis
+                        de cada construção.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="form-security-note">
+
+            <i class="bi bi-shield-check"></i>
+
+            <div>
+
+                <strong>
+                    Dados organizados
+                </strong>
+
+                <span>
+                    As informações ficam vinculadas à empresa
+                    atualmente conectada.
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const inicio =
+        document.getElementById("data_inicio");
+
+    const termino =
+        document.getElementById("previsao_termino");
+
+
+    if (inicio && termino) {
+
+        inicio.addEventListener("change", function () {
+
+            if (inicio.value) {
+
+                termino.min = inicio.value;
+
+                if (
+                    termino.value &&
+                    termino.value < inicio.value
+                ) {
+                    termino.value = "";
+                }
+
+            }
+
+        });
+
+    }
+
+});
+
+</script>
+
+{% endblock %}
