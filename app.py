@@ -55,13 +55,43 @@ class Empresa(db.Model):
     __tablename__ = "empresas"
 
     id = db.Column(db.Integer, primary_key=True)
-    razao_social = db.Column(db.String(150), nullable=False)
-    nome_fantasia = db.Column(db.String(150), nullable=False)
-    cnpj = db.Column(db.String(30), unique=True, nullable=True)
-    telefone = db.Column(db.String(30), nullable=True)
-    email = db.Column(db.String(150), nullable=True)
-    endereco = db.Column(db.String(255), nullable=True)
-    ativo = db.Column(db.Boolean, default=True, nullable=False)
+
+    razao_social = db.Column(
+        db.String(150),
+        nullable=False
+    )
+
+    nome_fantasia = db.Column(
+        db.String(150),
+        nullable=False
+    )
+
+    cnpj = db.Column(
+        db.String(30),
+        unique=True,
+        nullable=True
+    )
+
+    telefone = db.Column(
+        db.String(30),
+        nullable=True
+    )
+
+    email = db.Column(
+        db.String(150),
+        nullable=True
+    )
+
+    endereco = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    ativo = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
 
     usuarios = db.relationship(
         "Usuario",
@@ -79,9 +109,15 @@ class Empresa(db.Model):
 class Usuario(db.Model):
     __tablename__ = "usuarios"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
-    nome = db.Column(db.String(150), nullable=False)
+    nome = db.Column(
+        db.String(150),
+        nullable=False
+    )
 
     usuario = db.Column(
         db.String(80),
@@ -118,7 +154,9 @@ class Usuario(db.Model):
     )
 
     def definir_senha(self, senha):
-        self.senha_hash = generate_password_hash(senha)
+        self.senha_hash = generate_password_hash(
+            senha
+        )
 
     def verificar_senha(self, senha):
         return check_password_hash(
@@ -130,7 +168,10 @@ class Usuario(db.Model):
 class Obra(db.Model):
     __tablename__ = "obras"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     empresa_id = db.Column(
         db.Integer,
@@ -188,7 +229,10 @@ class Obra(db.Model):
 class Material(db.Model):
     __tablename__ = "materiais"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     categoria = db.Column(
         db.String(100),
@@ -235,7 +279,10 @@ class Material(db.Model):
 class Solicitacao(db.Model):
     __tablename__ = "solicitacoes"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     obra_id = db.Column(
         db.Integer,
@@ -286,19 +333,44 @@ class Solicitacao(db.Model):
 # ============================================================
 
 def usuario_atual():
+    """
+    Retorna o usuário atualmente autenticado.
+    """
+
     usuario_id = session.get("usuario_id")
 
     if not usuario_id:
         return None
 
-    return db.session.get(Usuario, usuario_id)
+    return db.session.get(
+        Usuario,
+        usuario_id
+    )
+
+
+def eh_administrador():
+    """
+    Verifica se o usuário atual é o ADM global da plataforma.
+    """
+
+    usuario = usuario_atual()
+
+    if not usuario:
+        return False
+
+    return usuario.funcao.strip().lower() == "adm"
 
 
 def login_obrigatorio(func):
+    """
+    Protege rotas que exigem autenticação.
+    """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
 
         if not session.get("usuario_id"):
+
             flash(
                 "Faça login para continuar.",
                 "warning"
@@ -311,6 +383,7 @@ def login_obrigatorio(func):
         usuario = usuario_atual()
 
         if not usuario or not usuario.ativo:
+
             session.clear()
 
             flash(
@@ -327,10 +400,65 @@ def login_obrigatorio(func):
     return wrapper
 
 
+def admin_obrigatorio():
+    """
+    Protege áreas exclusivas do administrador global.
+
+    Retorna uma resposta Flask quando o acesso deve ser bloqueado.
+    Retorna None quando o usuário pode continuar.
+    """
+
+    usuario = usuario_atual()
+
+    if not usuario:
+
+        flash(
+            "Faça login para acessar a administração.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("login")
+        )
+
+    if not usuario.ativo:
+
+        session.clear()
+
+        flash(
+            "Usuário desativado.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("login")
+        )
+
+    if not eh_administrador():
+
+        flash(
+            "Acesso restrito ao administrador da plataforma.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("dashboard")
+        )
+
+    return None
+
+
 @app.context_processor
 def dados_globais():
+
+    usuario = usuario_atual()
+
     return {
-        "usuario_logado": usuario_atual()
+        "usuario_logado": usuario,
+        "usuario_eh_admin": (
+            usuario is not None
+            and usuario.funcao.strip().lower() == "adm"
+        )
     }
 
 
@@ -344,7 +472,10 @@ def inicializar_banco():
 
         db.create_all()
 
-        # Cria empresa padrão somente se não existir
+        # ----------------------------------------------------
+        # EMPRESA PADRÃO
+        # ----------------------------------------------------
+
         empresa = Empresa.query.first()
 
         if not empresa:
@@ -358,11 +489,15 @@ def inicializar_banco():
             db.session.add(empresa)
             db.session.commit()
 
-        # Cria administrador inicial somente se não existir
+
+        # ----------------------------------------------------
+        # ADMINISTRADOR GLOBAL
+        # ----------------------------------------------------
+
         admin_usuario = os.getenv(
             "ADMIN_USER",
             "admin"
-        )
+        ).strip()
 
         admin_senha = os.getenv(
             "ADMIN_PASSWORD",
@@ -373,19 +508,59 @@ def inicializar_banco():
             usuario=admin_usuario
         ).first()
 
-        if not usuario and admin_senha:
+
+        # ----------------------------------------------------
+        # SE O ADM JÁ EXISTIR
+        # ----------------------------------------------------
+
+        if usuario:
+
+            alterou = False
+
+            if usuario.funcao.strip().lower() != "adm":
+
+                usuario.funcao = "ADM"
+                alterou = True
+
+            if usuario.empresa_id is not None:
+
+                usuario.empresa_id = None
+                alterou = True
+
+            if not usuario.ativo:
+
+                usuario.ativo = True
+                alterou = True
+
+            # Se a senha foi definida no Render,
+            # mantém a senha atual para evitar alterar
+            # a senha automaticamente em todos os deploys.
+
+            if alterou:
+
+                db.session.commit()
+
+
+        # ----------------------------------------------------
+        # SE O ADM AINDA NÃO EXISTIR
+        # ----------------------------------------------------
+
+        elif admin_senha:
 
             usuario = Usuario(
-                nome="Administrador",
+                nome="Administrador da Plataforma",
                 usuario=admin_usuario,
-                funcao="administrador",
-                empresa_id=empresa.id,
+                funcao="ADM",
+                empresa_id=None,
                 ativo=True
             )
 
-            usuario.definir_senha(admin_senha)
+            usuario.definir_senha(
+                admin_senha
+            )
 
             db.session.add(usuario)
+
             db.session.commit()
 
 
@@ -393,13 +568,30 @@ def inicializar_banco():
 # LOGIN
 # ============================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if session.get("usuario_id"):
-        return redirect(
-            url_for("dashboard")
-        )
+
+        usuario = usuario_atual()
+
+        if usuario and usuario.ativo:
+
+            if eh_administrador():
+
+                return redirect(
+                    url_for("admin_dashboard")
+                )
+
+            return redirect(
+                url_for("dashboard")
+            )
+
+        session.clear()
+
 
     if request.method == "POST":
 
@@ -427,17 +619,33 @@ def login():
 
             session["usuario_id"] = usuario.id
 
+            # ADM GLOBAL
+            if eh_administrador():
+
+                return redirect(
+                    url_for("admin_dashboard")
+                )
+
+            # USUÁRIO DA EMPRESA
             return redirect(
                 url_for("dashboard")
             )
+
 
         flash(
             "Usuário ou senha inválidos.",
             "danger"
         )
 
-    return render_template("login.html")
 
+    return render_template(
+        "login.html"
+    )
+
+
+# ============================================================
+# LOGOUT
+# ============================================================
 
 @app.route("/logout")
 def logout():
@@ -455,7 +663,54 @@ def logout():
 
 
 # ============================================================
-# DASHBOARD
+# PAINEL ADMINISTRATIVO GLOBAL
+# ============================================================
+
+@app.route("/admin")
+@login_obrigatorio
+def admin_dashboard():
+
+    bloqueio = admin_obrigatorio()
+
+    if bloqueio:
+
+        return bloqueio
+
+
+    # --------------------------------------------------------
+    # INDICADORES GERAIS DA PLATAFORMA
+    # --------------------------------------------------------
+
+    total_empresas = Empresa.query.count()
+
+    total_usuarios = Usuario.query.count()
+
+    total_obras = Obra.query.count()
+
+    total_solicitacoes = Solicitacao.query.count()
+
+
+    # --------------------------------------------------------
+    # EMPRESAS
+    # --------------------------------------------------------
+
+    empresas = Empresa.query.order_by(
+        Empresa.nome_fantasia.asc()
+    ).all()
+
+
+    return render_template(
+        "admin_dashboard.html",
+        total_empresas=total_empresas,
+        total_usuarios=total_usuarios,
+        total_obras=total_obras,
+        total_solicitacoes=total_solicitacoes,
+        empresas=empresas
+    )
+
+
+# ============================================================
+# DASHBOARD DA EMPRESA
 # ============================================================
 
 @app.route("/")
@@ -464,35 +719,64 @@ def dashboard():
 
     usuario = usuario_atual()
 
+    # ADM não utiliza o dashboard da empresa.
+    if eh_administrador():
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+
     obras_query = Obra.query
 
     if usuario.empresa_id:
+
         obras_query = obras_query.filter_by(
             empresa_id=usuario.empresa_id
         )
+
+    else:
+
+        obras_query = obras_query.filter(
+            Obra.id == -1
+        )
+
 
     obras = obras_query.all()
 
     total_obras = len(obras)
 
+
     obras_ativas = sum(
         1
         for obra in obras
-        if obra.status == "andamento"
+        if obra.status in (
+            "andamento",
+            "em andamento"
+        )
     )
+
 
     total_materiais = Material.query.filter_by(
         ativo=True
     ).count()
+
 
     materiais_baixos = Material.query.filter(
         Material.ativo.is_(True),
         Material.estoque_atual <= Material.estoque_minimo
     ).count()
 
-    solicitacoes_pendentes = Solicitacao.query.filter_by(
-        status="pendente"
+
+    # Solicitações somente das obras da empresa
+    solicitacoes_pendentes = Solicitacao.query.join(
+        Obra,
+        Solicitacao.obra_id == Obra.id
+    ).filter(
+        Obra.empresa_id == usuario.empresa_id,
+        Solicitacao.status == "pendente"
     ).count()
+
 
     return render_template(
         "dashboard.html",
@@ -514,16 +798,33 @@ def obras():
 
     usuario = usuario_atual()
 
+    # O ADM deve trabalhar pelo painel global.
+    if eh_administrador():
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+
     query = Obra.query
 
     if usuario.empresa_id:
+
         query = query.filter_by(
             empresa_id=usuario.empresa_id
         )
 
+    else:
+
+        query = query.filter(
+            Obra.id == -1
+        )
+
+
     lista = query.order_by(
         Obra.id.desc()
     ).all()
+
 
     return render_template(
         "obras.html",
@@ -531,11 +832,41 @@ def obras():
     )
 
 
-@app.route("/obras/nova", methods=["GET", "POST"])
+@app.route(
+    "/obras/nova",
+    methods=["GET", "POST"]
+)
 @login_obrigatorio
 def nova_obra():
 
     usuario = usuario_atual()
+
+
+    # ADM não cadastra obra sem selecionar
+    # uma empresa específica.
+    if eh_administrador():
+
+        flash(
+            "Selecione uma empresa pelo painel administrativo para cadastrar uma obra.",
+            "info"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+
+    if not usuario.empresa_id:
+
+        flash(
+            "Seu usuário não está vinculado a uma empresa.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("dashboard")
+        )
+
 
     if request.method == "POST":
 
@@ -543,6 +874,7 @@ def nova_obra():
             "nome",
             ""
         ).strip()
+
 
         if not nome:
 
@@ -555,42 +887,125 @@ def nova_obra():
                 url_for("nova_obra")
             )
 
+
+        # ----------------------------------------------------
+        # DATAS
+        # ----------------------------------------------------
+
+        data_inicio = None
+
+        previsao_termino = None
+
+
+        data_inicio_texto = request.form.get(
+            "data_inicio",
+            ""
+        ).strip()
+
+
+        previsao_termino_texto = request.form.get(
+            "previsao_termino",
+            ""
+        ).strip()
+
+
+        try:
+
+            if data_inicio_texto:
+
+                data_inicio = datetime.strptime(
+                    data_inicio_texto,
+                    "%Y-%m-%d"
+                ).date()
+
+
+            if previsao_termino_texto:
+
+                previsao_termino = datetime.strptime(
+                    previsao_termino_texto,
+                    "%Y-%m-%d"
+                ).date()
+
+
+        except ValueError:
+
+            flash(
+                "Uma das datas informadas é inválida.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("nova_obra")
+            )
+
+
+        if (
+            data_inicio
+            and previsao_termino
+            and previsao_termino < data_inicio
+        ):
+
+            flash(
+                "A previsão de término não pode ser anterior à data de início.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("nova_obra")
+            )
+
+
         obra = Obra(
             empresa_id=usuario.empresa_id,
+
             nome=nome,
+
             cliente=request.form.get(
                 "cliente",
                 ""
             ).strip(),
+
             endereco=request.form.get(
                 "endereco",
                 ""
             ).strip(),
+
             responsavel=request.form.get(
                 "responsavel",
                 ""
             ).strip(),
+
+            data_inicio=data_inicio,
+
+            previsao_termino=previsao_termino,
+
             status=request.form.get(
                 "status",
                 "planejamento"
             ),
+
             observacoes=request.form.get(
                 "observacoes",
                 ""
             ).strip()
         )
 
+
         db.session.add(obra)
+
         db.session.commit()
+
 
         flash(
             "Obra cadastrada com sucesso.",
             "success"
         )
 
+
         return redirect(
             url_for("obras")
         )
+
 
     return render_template(
         "obra_form.html",
@@ -606,6 +1021,8 @@ def nova_obra():
 @login_obrigatorio
 def materiais():
 
+    # O catálogo de materiais é global neste momento.
+    # Nenhum preço é armazenado.
     lista = Material.query.filter_by(
         ativo=True
     ).order_by(
@@ -613,15 +1030,33 @@ def materiais():
         Material.nome
     ).all()
 
+
     return render_template(
         "materiais.html",
         materiais=lista
     )
 
 
-@app.route("/materiais/novo", methods=["GET", "POST"])
+@app.route(
+    "/materiais/novo",
+    methods=["GET", "POST"]
+)
 @login_obrigatorio
 def novo_material():
+
+    # Cadastro de material será posteriormente
+    # controlado pelo perfil administrativo.
+    if eh_administrador():
+
+        flash(
+            "O cadastro global de materiais será realizado pelo módulo administrativo.",
+            "info"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
 
     if request.method == "POST":
 
@@ -630,15 +1065,18 @@ def novo_material():
             ""
         ).strip()
 
+
         categoria = request.form.get(
             "categoria",
             ""
         ).strip()
 
+
         unidade = request.form.get(
             "unidade",
             ""
         ).strip()
+
 
         if not nome or not categoria or not unidade:
 
@@ -651,6 +1089,7 @@ def novo_material():
                 url_for("novo_material")
             )
 
+
         try:
 
             estoque_minimo = float(
@@ -660,12 +1099,14 @@ def novo_material():
                 ) or 0
             )
 
+
             estoque_atual = float(
                 request.form.get(
                     "estoque_atual",
                     0
                 ) or 0
             )
+
 
         except ValueError:
 
@@ -678,29 +1119,55 @@ def novo_material():
                 url_for("novo_material")
             )
 
+
+        if estoque_minimo < 0 or estoque_atual < 0:
+
+            flash(
+                "Os valores de estoque não podem ser negativos.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("novo_material")
+            )
+
+
         material = Material(
+
             categoria=categoria,
+
             nome=nome,
+
             descricao=request.form.get(
                 "descricao",
                 ""
             ).strip(),
+
             unidade=unidade,
+
             estoque_minimo=estoque_minimo,
-            estoque_atual=estoque_atual
+
+            estoque_atual=estoque_atual,
+
+            ativo=True
         )
 
+
         db.session.add(material)
+
         db.session.commit()
+
 
         flash(
             "Material cadastrado com sucesso.",
             "success"
         )
 
+
         return redirect(
             url_for("materiais")
         )
+
 
     return render_template(
         "material_form.html"
@@ -717,7 +1184,18 @@ def solicitacoes():
 
     usuario = usuario_atual()
 
+
+    # ADM visualiza o painel global em vez da tela
+    # operacional de uma empresa específica.
+    if eh_administrador():
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+
     query = Solicitacao.query
+
 
     if usuario.empresa_id:
 
@@ -728,9 +1206,17 @@ def solicitacoes():
             Obra.empresa_id == usuario.empresa_id
         )
 
+    else:
+
+        query = query.filter(
+            Solicitacao.id == -1
+        )
+
+
     lista = query.order_by(
         Solicitacao.id.desc()
     ).all()
+
 
     return render_template(
         "solicitacoes.html",
@@ -747,11 +1233,45 @@ def nova_solicitacao():
 
     usuario = usuario_atual()
 
+
+    if eh_administrador():
+
+        flash(
+            "O ADM deve selecionar uma empresa antes de criar uma solicitação.",
+            "info"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+
+    if not usuario.empresa_id:
+
+        flash(
+            "Seu usuário não está vinculado a uma empresa.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("dashboard")
+        )
+
+
+    # --------------------------------------------------------
+    # OBRAS DA EMPRESA
+    # --------------------------------------------------------
+
     obras = Obra.query.filter_by(
         empresa_id=usuario.empresa_id
     ).order_by(
         Obra.nome
     ).all()
+
+
+    # --------------------------------------------------------
+    # MATERIAIS ATIVOS
+    # --------------------------------------------------------
 
     materiais = Material.query.filter_by(
         ativo=True
@@ -759,23 +1279,36 @@ def nova_solicitacao():
         Material.nome
     ).all()
 
+
     if request.method == "POST":
 
         try:
 
             obra_id = int(
-                request.form.get("obra_id")
+                request.form.get(
+                    "obra_id"
+                )
             )
+
 
             material_id = int(
-                request.form.get("material_id")
+                request.form.get(
+                    "material_id"
+                )
             )
+
 
             quantidade = float(
-                request.form.get("quantidade")
+                request.form.get(
+                    "quantidade"
+                )
             )
 
-        except (ValueError, TypeError):
+
+        except (
+            ValueError,
+            TypeError
+        ):
 
             flash(
                 "Dados da solicitação inválidos.",
@@ -786,17 +1319,21 @@ def nova_solicitacao():
                 url_for("nova_solicitacao")
             )
 
+
+        # ----------------------------------------------------
+        # VALIDA OBRA
+        # ----------------------------------------------------
+
         obra = db.session.get(
             Obra,
             obra_id
         )
 
-        material = db.session.get(
-            Material,
-            material_id
-        )
 
-        if not obra or obra.empresa_id != usuario.empresa_id:
+        if (
+            not obra
+            or obra.empresa_id != usuario.empresa_id
+        ):
 
             flash(
                 "Obra inválida.",
@@ -807,7 +1344,21 @@ def nova_solicitacao():
                 url_for("nova_solicitacao")
             )
 
-        if not material or not material.ativo:
+
+        # ----------------------------------------------------
+        # VALIDA MATERIAL
+        # ----------------------------------------------------
+
+        material = db.session.get(
+            Material,
+            material_id
+        )
+
+
+        if (
+            not material
+            or not material.ativo
+        ):
 
             flash(
                 "Material inválido.",
@@ -817,6 +1368,11 @@ def nova_solicitacao():
             return redirect(
                 url_for("nova_solicitacao")
             )
+
+
+        # ----------------------------------------------------
+        # VALIDA QUANTIDADE
+        # ----------------------------------------------------
 
         if quantidade <= 0:
 
@@ -829,29 +1385,47 @@ def nova_solicitacao():
                 url_for("nova_solicitacao")
             )
 
+
+        # ----------------------------------------------------
+        # CRIA SOLICITAÇÃO
+        # ----------------------------------------------------
+
         solicitacao = Solicitacao(
+
             obra_id=obra.id,
+
             material_id=material.id,
+
             usuario_id=usuario.id,
+
             quantidade=quantidade,
+
             observacao=request.form.get(
                 "observacao",
                 ""
             ).strip(),
+
             status="pendente"
         )
 
-        db.session.add(solicitacao)
+
+        db.session.add(
+            solicitacao
+        )
+
         db.session.commit()
+
 
         flash(
             "Solicitação enviada com sucesso.",
             "success"
         )
 
+
         return redirect(
             url_for("solicitacoes")
         )
+
 
     return render_template(
         "solicitacao_form.html",
@@ -887,6 +1461,7 @@ def erro_interno(error):
 # ============================================================
 
 with app.app_context():
+
     inicializar_banco()
 
 
