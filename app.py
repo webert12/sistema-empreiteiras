@@ -54,7 +54,10 @@ db = SQLAlchemy(app)
 class Empresa(db.Model):
     __tablename__ = "empresas"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     razao_social = db.Column(
         db.String(150),
@@ -358,7 +361,10 @@ def eh_administrador():
     if not usuario:
         return False
 
-    return usuario.funcao.strip().lower() == "adm"
+    return (
+        usuario.funcao
+        and usuario.funcao.strip().lower() == "adm"
+    )
 
 
 def login_obrigatorio(func):
@@ -457,6 +463,7 @@ def dados_globais():
         "usuario_logado": usuario,
         "usuario_eh_admin": (
             usuario is not None
+            and usuario.funcao
             and usuario.funcao.strip().lower() == "adm"
         )
     }
@@ -487,6 +494,7 @@ def inicializar_banco():
             )
 
             db.session.add(empresa)
+
             db.session.commit()
 
 
@@ -504,6 +512,7 @@ def inicializar_banco():
             ""
         )
 
+
         usuario = Usuario.query.filter_by(
             usuario=admin_usuario
         ).first()
@@ -517,24 +526,34 @@ def inicializar_banco():
 
             alterou = False
 
-            if usuario.funcao.strip().lower() != "adm":
+
+            if (
+                not usuario.funcao
+                or usuario.funcao.strip().lower() != "adm"
+            ):
 
                 usuario.funcao = "ADM"
+
                 alterou = True
+
 
             if usuario.empresa_id is not None:
 
                 usuario.empresa_id = None
+
                 alterou = True
+
 
             if not usuario.ativo:
 
                 usuario.ativo = True
+
                 alterou = True
 
-            # Se a senha foi definida no Render,
-            # mantém a senha atual para evitar alterar
-            # a senha automaticamente em todos os deploys.
+
+            # A senha existente NÃO é alterada automaticamente.
+            # Isso evita trocar a senha do administrador a cada deploy.
+
 
             if alterou:
 
@@ -605,9 +624,11 @@ def login():
             ""
         )
 
+
         usuario = Usuario.query.filter_by(
             usuario=usuario_digitado
         ).first()
+
 
         if (
             usuario
@@ -619,14 +640,14 @@ def login():
 
             session["usuario_id"] = usuario.id
 
-            # ADM GLOBAL
+
             if eh_administrador():
 
                 return redirect(
                     url_for("admin_dashboard")
                 )
 
-            # USUÁRIO DA EMPRESA
+
             return redirect(
                 url_for("dashboard")
             )
@@ -678,7 +699,7 @@ def admin_dashboard():
 
 
     # --------------------------------------------------------
-    # INDICADORES GERAIS DA PLATAFORMA
+    # INDICADORES GERAIS
     # --------------------------------------------------------
 
     total_empresas = Empresa.query.count()
@@ -710,6 +731,413 @@ def admin_dashboard():
 
 
 # ============================================================
+# ADMIN - NOVA EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/nova",
+    methods=["GET", "POST"]
+)
+@login_obrigatorio
+def admin_nova_empresa():
+
+    bloqueio = admin_obrigatorio()
+
+    if bloqueio:
+
+        return bloqueio
+
+
+    if request.method == "POST":
+
+        razao_social = request.form.get(
+            "razao_social",
+            ""
+        ).strip()
+
+
+        nome_fantasia = request.form.get(
+            "nome_fantasia",
+            ""
+        ).strip()
+
+
+        cnpj = request.form.get(
+            "cnpj",
+            ""
+        ).strip()
+
+
+        telefone = request.form.get(
+            "telefone",
+            ""
+        ).strip()
+
+
+        email = request.form.get(
+            "email",
+            ""
+        ).strip()
+
+
+        endereco = request.form.get(
+            "endereco",
+            ""
+        ).strip()
+
+
+        # ----------------------------------------------------
+        # VALIDAÇÃO
+        # ----------------------------------------------------
+
+        if not razao_social:
+
+            flash(
+                "Informe a razão social da empresa.",
+                "danger"
+            )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=None
+            )
+
+
+        # Nome fantasia é obrigatório no banco.
+        # Se não informado, utilizamos a razão social.
+        if not nome_fantasia:
+
+            nome_fantasia = razao_social
+
+
+        # ----------------------------------------------------
+        # CNPJ DUPLICADO
+        # ----------------------------------------------------
+
+        if cnpj:
+
+            empresa_existente = Empresa.query.filter_by(
+                cnpj=cnpj
+            ).first()
+
+            if empresa_existente:
+
+                flash(
+                    "Já existe uma empresa cadastrada com este CNPJ.",
+                    "danger"
+                )
+
+                return render_template(
+                    "empresa_form.html",
+                    empresa=None
+                )
+
+
+        # ----------------------------------------------------
+        # CRIA EMPRESA
+        # ----------------------------------------------------
+
+        empresa = Empresa(
+
+            razao_social=razao_social,
+
+            nome_fantasia=nome_fantasia,
+
+            cnpj=cnpj or None,
+
+            telefone=telefone or None,
+
+            email=email or None,
+
+            endereco=endereco or None,
+
+            ativo=True
+        )
+
+
+        db.session.add(
+            empresa
+        )
+
+        db.session.commit()
+
+
+        flash(
+            f'Empresa "{empresa.nome_fantasia}" '
+            "cadastrada com sucesso.",
+            "success"
+        )
+
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+
+    return render_template(
+        "empresa_form.html",
+        empresa=None
+    )
+
+
+# ============================================================
+# ADMIN - VISUALIZAR EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>"
+)
+@login_obrigatorio
+def admin_empresa_detalhes(empresa_id):
+
+    bloqueio = admin_obrigatorio()
+
+    if bloqueio:
+
+        return bloqueio
+
+
+    empresa = Empresa.query.get_or_404(
+        empresa_id
+    )
+
+
+    # --------------------------------------------------------
+    # USUÁRIOS DA EMPRESA
+    # --------------------------------------------------------
+
+    usuarios = Usuario.query.filter_by(
+        empresa_id=empresa.id
+    ).order_by(
+        Usuario.nome.asc()
+    ).all()
+
+
+    # --------------------------------------------------------
+    # OBRAS DA EMPRESA
+    # --------------------------------------------------------
+
+    obras = Obra.query.filter_by(
+        empresa_id=empresa.id
+    ).order_by(
+        Obra.criado_em.desc()
+    ).all()
+
+
+    return render_template(
+        "empresa_detalhes.html",
+        empresa=empresa,
+        usuarios=usuarios,
+        obras=obras
+    )
+
+
+# ============================================================
+# ADMIN - EDITAR EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>/editar",
+    methods=["GET", "POST"]
+)
+@login_obrigatorio
+def admin_editar_empresa(empresa_id):
+
+    bloqueio = admin_obrigatorio()
+
+    if bloqueio:
+
+        return bloqueio
+
+
+    empresa = Empresa.query.get_or_404(
+        empresa_id
+    )
+
+
+    if request.method == "POST":
+
+        razao_social = request.form.get(
+            "razao_social",
+            ""
+        ).strip()
+
+
+        nome_fantasia = request.form.get(
+            "nome_fantasia",
+            ""
+        ).strip()
+
+
+        cnpj = request.form.get(
+            "cnpj",
+            ""
+        ).strip()
+
+
+        telefone = request.form.get(
+            "telefone",
+            ""
+        ).strip()
+
+
+        email = request.form.get(
+            "email",
+            ""
+        ).strip()
+
+
+        endereco = request.form.get(
+            "endereco",
+            ""
+        ).strip()
+
+
+        # ----------------------------------------------------
+        # VALIDAÇÃO
+        # ----------------------------------------------------
+
+        if not razao_social:
+
+            flash(
+                "A razão social é obrigatória.",
+                "danger"
+            )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=empresa
+            )
+
+
+        if not nome_fantasia:
+
+            nome_fantasia = razao_social
+
+
+        # ----------------------------------------------------
+        # VERIFICA CNPJ
+        # ----------------------------------------------------
+
+        if cnpj:
+
+            empresa_existente = Empresa.query.filter(
+                Empresa.cnpj == cnpj,
+                Empresa.id != empresa.id
+            ).first()
+
+
+            if empresa_existente:
+
+                flash(
+                    "Já existe outra empresa cadastrada com este CNPJ.",
+                    "danger"
+                )
+
+                return render_template(
+                    "empresa_form.html",
+                    empresa=empresa
+                )
+
+
+        # ----------------------------------------------------
+        # ATUALIZA DADOS
+        # ----------------------------------------------------
+
+        empresa.razao_social = razao_social
+
+        empresa.nome_fantasia = nome_fantasia
+
+        empresa.cnpj = cnpj or None
+
+        empresa.telefone = telefone or None
+
+        empresa.email = email or None
+
+        empresa.endereco = endereco or None
+
+
+        db.session.commit()
+
+
+        flash(
+            "Dados da empresa atualizados com sucesso.",
+            "success"
+        )
+
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+
+    return render_template(
+        "empresa_form.html",
+        empresa=empresa
+    )
+
+
+# ============================================================
+# ADMIN - ATIVAR / DESATIVAR EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>/alternar-status",
+    methods=["POST"]
+)
+@login_obrigatorio
+def admin_alternar_status_empresa(empresa_id):
+
+    bloqueio = admin_obrigatorio()
+
+    if bloqueio:
+
+        return bloqueio
+
+
+    empresa = Empresa.query.get_or_404(
+        empresa_id
+    )
+
+
+    empresa.ativo = not empresa.ativo
+
+
+    db.session.commit()
+
+
+    if empresa.ativo:
+
+        flash(
+            f'Empresa "{empresa.nome_fantasia}" '
+            "ativada com sucesso.",
+            "success"
+        )
+
+    else:
+
+        flash(
+            f'Empresa "{empresa.nome_fantasia}" '
+            "desativada com sucesso.",
+            "warning"
+        )
+
+
+    return redirect(
+        url_for(
+            "admin_empresa_detalhes",
+            empresa_id=empresa.id
+        )
+    )
+
+
+# ============================================================
 # DASHBOARD DA EMPRESA
 # ============================================================
 
@@ -719,7 +1147,8 @@ def dashboard():
 
     usuario = usuario_atual()
 
-    # ADM não utiliza o dashboard da empresa.
+
+    # ADM não utiliza o dashboard operacional.
     if eh_administrador():
 
         return redirect(
@@ -727,7 +1156,12 @@ def dashboard():
         )
 
 
+    # --------------------------------------------------------
+    # OBRAS DA EMPRESA
+    # --------------------------------------------------------
+
     obras_query = Obra.query
+
 
     if usuario.empresa_id:
 
@@ -744,6 +1178,7 @@ def dashboard():
 
     obras = obras_query.all()
 
+
     total_obras = len(obras)
 
 
@@ -757,6 +1192,10 @@ def dashboard():
     )
 
 
+    # --------------------------------------------------------
+    # MATERIAIS
+    # --------------------------------------------------------
+
     total_materiais = Material.query.filter_by(
         ativo=True
     ).count()
@@ -768,7 +1207,10 @@ def dashboard():
     ).count()
 
 
-    # Solicitações somente das obras da empresa
+    # --------------------------------------------------------
+    # SOLICITAÇÕES PENDENTES
+    # --------------------------------------------------------
+
     solicitacoes_pendentes = Solicitacao.query.join(
         Obra,
         Solicitacao.obra_id == Obra.id
@@ -798,7 +1240,8 @@ def obras():
 
     usuario = usuario_atual()
 
-    # O ADM deve trabalhar pelo painel global.
+
+    # ADM trabalha pelo painel administrativo.
     if eh_administrador():
 
         return redirect(
@@ -807,6 +1250,7 @@ def obras():
 
 
     query = Obra.query
+
 
     if usuario.empresa_id:
 
@@ -832,6 +1276,10 @@ def obras():
     )
 
 
+# ============================================================
+# NOVA OBRA
+# ============================================================
+
 @app.route(
     "/obras/nova",
     methods=["GET", "POST"]
@@ -842,12 +1290,15 @@ def nova_obra():
     usuario = usuario_atual()
 
 
-    # ADM não cadastra obra sem selecionar
-    # uma empresa específica.
+    # --------------------------------------------------------
+    # ADM
+    # --------------------------------------------------------
+
     if eh_administrador():
 
         flash(
-            "Selecione uma empresa pelo painel administrativo para cadastrar uma obra.",
+            "Selecione uma empresa pelo painel administrativo "
+            "para cadastrar uma obra.",
             "info"
         )
 
@@ -855,6 +1306,10 @@ def nova_obra():
             url_for("admin_dashboard")
         )
 
+
+    # --------------------------------------------------------
+    # USUÁRIO SEM EMPRESA
+    # --------------------------------------------------------
 
     if not usuario.empresa_id:
 
@@ -946,7 +1401,8 @@ def nova_obra():
         ):
 
             flash(
-                "A previsão de término não pode ser anterior à data de início.",
+                "A previsão de término não pode ser anterior "
+                "à data de início.",
                 "danger"
             )
 
@@ -956,6 +1412,7 @@ def nova_obra():
 
 
         obra = Obra(
+
             empresa_id=usuario.empresa_id,
 
             nome=nome,
@@ -991,7 +1448,9 @@ def nova_obra():
         )
 
 
-        db.session.add(obra)
+        db.session.add(
+            obra
+        )
 
         db.session.commit()
 
@@ -1023,6 +1482,7 @@ def materiais():
 
     # O catálogo de materiais é global neste momento.
     # Nenhum preço é armazenado.
+
     lista = Material.query.filter_by(
         ativo=True
     ).order_by(
@@ -1037,6 +1497,10 @@ def materiais():
     )
 
 
+# ============================================================
+# NOVO MATERIAL
+# ============================================================
+
 @app.route(
     "/materiais/novo",
     methods=["GET", "POST"]
@@ -1044,12 +1508,14 @@ def materiais():
 @login_obrigatorio
 def novo_material():
 
-    # Cadastro de material será posteriormente
-    # controlado pelo perfil administrativo.
+    # Cadastro global será posteriormente
+    # controlado pelo módulo administrativo.
+
     if eh_administrador():
 
         flash(
-            "O cadastro global de materiais será realizado pelo módulo administrativo.",
+            "O cadastro global de materiais será realizado "
+            "pelo módulo administrativo.",
             "info"
         )
 
@@ -1153,7 +1619,9 @@ def novo_material():
         )
 
 
-        db.session.add(material)
+        db.session.add(
+            material
+        )
 
         db.session.commit()
 
@@ -1185,8 +1653,7 @@ def solicitacoes():
     usuario = usuario_atual()
 
 
-    # ADM visualiza o painel global em vez da tela
-    # operacional de uma empresa específica.
+    # ADM visualiza o painel global.
     if eh_administrador():
 
         return redirect(
@@ -1224,6 +1691,10 @@ def solicitacoes():
     )
 
 
+# ============================================================
+# NOVA SOLICITAÇÃO
+# ============================================================
+
 @app.route(
     "/solicitacoes/nova",
     methods=["GET", "POST"]
@@ -1237,7 +1708,8 @@ def nova_solicitacao():
     if eh_administrador():
 
         flash(
-            "O ADM deve selecionar uma empresa antes de criar uma solicitação.",
+            "O ADM deve selecionar uma empresa antes "
+            "de criar uma solicitação.",
             "info"
         )
 
@@ -1435,7 +1907,7 @@ def nova_solicitacao():
 
 
 # ============================================================
-# ERROS
+# ERRO 404
 # ============================================================
 
 @app.errorhandler(404)
@@ -1445,6 +1917,10 @@ def pagina_nao_encontrada(error):
         "404.html"
     ), 404
 
+
+# ============================================================
+# ERRO 500
+# ============================================================
 
 @app.errorhandler(500)
 def erro_interno(error):
@@ -1464,6 +1940,10 @@ with app.app_context():
 
     inicializar_banco()
 
+
+# ============================================================
+# EXECUÇÃO LOCAL
+# ============================================================
 
 if __name__ == "__main__":
 
