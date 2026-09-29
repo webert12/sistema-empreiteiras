@@ -327,7 +327,9 @@ class Solicitacao(db.Model):
     )
 
     obra = db.relationship("Obra")
+
     material = db.relationship("Material")
+
     usuario = db.relationship("Usuario")
 
 
@@ -401,6 +403,34 @@ def login_obrigatorio(func):
                 url_for("login")
             )
 
+        # ----------------------------------------------------
+        # BLOQUEIO DE EMPRESA INATIVA
+        # ----------------------------------------------------
+
+        if (
+            usuario.empresa_id
+            and not eh_administrador()
+        ):
+
+            empresa = db.session.get(
+                Empresa,
+                usuario.empresa_id
+            )
+
+            if not empresa or not empresa.ativo:
+
+                session.clear()
+
+                flash(
+                    "A empresa vinculada ao seu usuário "
+                    "está desativada.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("login")
+                )
+
         return func(*args, **kwargs)
 
     return wrapper
@@ -461,6 +491,7 @@ def dados_globais():
 
     return {
         "usuario_logado": usuario,
+
         "usuario_eh_admin": (
             usuario is not None
             and usuario.funcao
@@ -493,7 +524,9 @@ def inicializar_banco():
                 ativo=True
             )
 
-            db.session.add(empresa)
+            db.session.add(
+                empresa
+            )
 
             db.session.commit()
 
@@ -578,7 +611,9 @@ def inicializar_banco():
                 admin_senha
             )
 
-            db.session.add(usuario)
+            db.session.add(
+                usuario
+            )
 
             db.session.commit()
 
@@ -599,15 +634,34 @@ def login():
 
         if usuario and usuario.ativo:
 
+            # ADM GLOBAL
             if eh_administrador():
 
                 return redirect(
                     url_for("admin_dashboard")
                 )
 
-            return redirect(
-                url_for("dashboard")
-            )
+            # Usuário de empresa
+            if usuario.empresa_id:
+
+                empresa = db.session.get(
+                    Empresa,
+                    usuario.empresa_id
+                )
+
+                if empresa and empresa.ativo:
+
+                    return redirect(
+                        url_for("dashboard")
+                    )
+
+                session.clear()
+
+            else:
+
+                return redirect(
+                    url_for("dashboard")
+                )
 
         session.clear()
 
@@ -635,6 +689,30 @@ def login():
             and usuario.ativo
             and usuario.verificar_senha(senha)
         ):
+
+            # ------------------------------------------------
+            # VERIFICA EMPRESA DO USUÁRIO
+            # ------------------------------------------------
+
+            if usuario.empresa_id:
+
+                empresa = db.session.get(
+                    Empresa,
+                    usuario.empresa_id
+                )
+
+                if not empresa or not empresa.ativo:
+
+                    flash(
+                        "A empresa vinculada a este usuário "
+                        "está desativada.",
+                        "danger"
+                    )
+
+                    return redirect(
+                        url_for("login")
+                    )
+
 
             session.clear()
 
@@ -722,10 +800,15 @@ def admin_dashboard():
 
     return render_template(
         "admin_dashboard.html",
+
         total_empresas=total_empresas,
+
         total_usuarios=total_usuarios,
+
         total_obras=total_obras,
+
         total_solicitacoes=total_solicitacoes,
+
         empresas=empresas
     )
 
@@ -799,12 +882,12 @@ def admin_nova_empresa():
 
             return render_template(
                 "empresa_form.html",
+                titulo="Nova empresa",
                 empresa=None
             )
 
 
         # Nome fantasia é obrigatório no banco.
-        # Se não informado, utilizamos a razão social.
         if not nome_fantasia:
 
             nome_fantasia = razao_social
@@ -820,15 +903,18 @@ def admin_nova_empresa():
                 cnpj=cnpj
             ).first()
 
+
             if empresa_existente:
 
                 flash(
-                    "Já existe uma empresa cadastrada com este CNPJ.",
+                    "Já existe uma empresa cadastrada "
+                    "com este CNPJ.",
                     "danger"
                 )
 
                 return render_template(
                     "empresa_form.html",
+                    titulo="Nova empresa",
                     empresa=None
                 )
 
@@ -879,6 +965,7 @@ def admin_nova_empresa():
 
     return render_template(
         "empresa_form.html",
+        titulo="Nova empresa",
         empresa=None
     )
 
@@ -917,6 +1004,18 @@ def admin_empresa_detalhes(empresa_id):
 
 
     # --------------------------------------------------------
+    # ADMINISTRADORES DA EMPRESA
+    # --------------------------------------------------------
+
+    administradores = Usuario.query.filter_by(
+        empresa_id=empresa.id,
+        funcao="administrador_empresa"
+    ).order_by(
+        Usuario.nome.asc()
+    ).all()
+
+
+    # --------------------------------------------------------
     # OBRAS DA EMPRESA
     # --------------------------------------------------------
 
@@ -927,11 +1026,49 @@ def admin_empresa_detalhes(empresa_id):
     ).all()
 
 
+    # --------------------------------------------------------
+    # INDICADORES
+    # --------------------------------------------------------
+
+    total_usuarios = Usuario.query.filter_by(
+        empresa_id=empresa.id
+    ).count()
+
+
+    total_obras = Obra.query.filter_by(
+        empresa_id=empresa.id
+    ).count()
+
+
+    total_solicitacoes = (
+        Solicitacao.query
+        .join(
+            Obra,
+            Solicitacao.obra_id == Obra.id
+        )
+        .filter(
+            Obra.empresa_id == empresa.id
+        )
+        .count()
+    )
+
+
     return render_template(
         "empresa_detalhes.html",
+
         empresa=empresa,
+
         usuarios=usuarios,
-        obras=obras
+
+        administradores=administradores,
+
+        obras=obras,
+
+        total_usuarios=total_usuarios,
+
+        total_obras=total_obras,
+
+        total_solicitacoes=total_solicitacoes
     )
 
 
@@ -1009,6 +1146,7 @@ def admin_editar_empresa(empresa_id):
 
             return render_template(
                 "empresa_form.html",
+                titulo="Editar empresa",
                 empresa=empresa
             )
 
@@ -1033,12 +1171,14 @@ def admin_editar_empresa(empresa_id):
             if empresa_existente:
 
                 flash(
-                    "Já existe outra empresa cadastrada com este CNPJ.",
+                    "Já existe outra empresa cadastrada "
+                    "com este CNPJ.",
                     "danger"
                 )
 
                 return render_template(
                     "empresa_form.html",
+                    titulo="Editar empresa",
                     empresa=empresa
                 )
 
@@ -1060,6 +1200,18 @@ def admin_editar_empresa(empresa_id):
         empresa.endereco = endereco or None
 
 
+        # ----------------------------------------------------
+        # STATUS
+        # ----------------------------------------------------
+
+        # Só altera o status se o campo estiver presente.
+        if "ativo" in request.form:
+
+            empresa.ativo = (
+                request.form.get("ativo") == "on"
+            )
+
+
         db.session.commit()
 
 
@@ -1079,6 +1231,7 @@ def admin_editar_empresa(empresa_id):
 
     return render_template(
         "empresa_form.html",
+        titulo="Editar empresa",
         empresa=empresa
     )
 
@@ -1092,7 +1245,7 @@ def admin_editar_empresa(empresa_id):
     methods=["POST"]
 )
 @login_obrigatorio
-def admin_alternar_status_empresa(empresa_id):
+def admin_alternar_empresa(empresa_id):
 
     bloqueio = admin_obrigatorio()
 
@@ -1138,6 +1291,214 @@ def admin_alternar_status_empresa(empresa_id):
 
 
 # ============================================================
+# ADMIN - NOVO ADMINISTRADOR DA EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>/novo-administrador",
+    methods=["GET", "POST"]
+)
+@login_obrigatorio
+def admin_novo_usuario_empresa(empresa_id):
+
+    bloqueio = admin_obrigatorio()
+
+    if bloqueio:
+
+        return bloqueio
+
+
+    empresa = Empresa.query.get_or_404(
+        empresa_id
+    )
+
+
+    # --------------------------------------------------------
+    # EMPRESA DESATIVADA
+    # --------------------------------------------------------
+
+    if not empresa.ativo:
+
+        flash(
+            "Não é possível criar um administrador "
+            "para uma empresa desativada.",
+            "warning"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+
+    if request.method == "POST":
+
+        nome = request.form.get(
+            "nome",
+            ""
+        ).strip()
+
+
+        usuario_digitado = request.form.get(
+            "usuario",
+            ""
+        ).strip().lower()
+
+
+        senha = request.form.get(
+            "senha",
+            ""
+        )
+
+
+        confirmar_senha = request.form.get(
+            "confirmar_senha",
+            ""
+        )
+
+
+        # ----------------------------------------------------
+        # NOME
+        # ----------------------------------------------------
+
+        if not nome:
+
+            flash(
+                "Informe o nome do administrador.",
+                "danger"
+            )
+
+            return render_template(
+                "usuario_empresa_form.html",
+                empresa=empresa
+            )
+
+
+        # ----------------------------------------------------
+        # USUÁRIO
+        # ----------------------------------------------------
+
+        if len(usuario_digitado) < 3:
+
+            flash(
+                "O usuário precisa ter pelo menos "
+                "3 caracteres.",
+                "danger"
+            )
+
+            return render_template(
+                "usuario_empresa_form.html",
+                empresa=empresa
+            )
+
+
+        # ----------------------------------------------------
+        # USUÁRIO DUPLICADO
+        # ----------------------------------------------------
+
+        usuario_existente = Usuario.query.filter_by(
+            usuario=usuario_digitado
+        ).first()
+
+
+        if usuario_existente:
+
+            flash(
+                "Esse nome de usuário já está sendo utilizado.",
+                "danger"
+            )
+
+            return render_template(
+                "usuario_empresa_form.html",
+                empresa=empresa
+            )
+
+
+        # ----------------------------------------------------
+        # SENHA
+        # ----------------------------------------------------
+
+        if len(senha) < 6:
+
+            flash(
+                "A senha precisa ter pelo menos "
+                "6 caracteres.",
+                "danger"
+            )
+
+            return render_template(
+                "usuario_empresa_form.html",
+                empresa=empresa
+            )
+
+
+        if senha != confirmar_senha:
+
+            flash(
+                "As senhas não coincidem.",
+                "danger"
+            )
+
+            return render_template(
+                "usuario_empresa_form.html",
+                empresa=empresa
+            )
+
+
+        # ----------------------------------------------------
+        # CRIA ADMINISTRADOR
+        # ----------------------------------------------------
+
+        novo_usuario = Usuario(
+
+            nome=nome,
+
+            usuario=usuario_digitado,
+
+            empresa_id=empresa.id,
+
+            funcao="administrador_empresa",
+
+            ativo=True
+        )
+
+
+        novo_usuario.definir_senha(
+            senha
+        )
+
+
+        db.session.add(
+            novo_usuario
+        )
+
+        db.session.commit()
+
+
+        flash(
+            f'Administrador "{nome}" criado com sucesso '
+            f'para {empresa.nome_fantasia}.',
+            "success"
+        )
+
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+
+    return render_template(
+        "usuario_empresa_form.html",
+        empresa=empresa
+    )
+
+
+# ============================================================
 # DASHBOARD DA EMPRESA
 # ============================================================
 
@@ -1148,7 +1509,7 @@ def dashboard():
     usuario = usuario_atual()
 
 
-    # ADM não utiliza o dashboard operacional.
+    # ADM utiliza o painel global.
     if eh_administrador():
 
         return redirect(
@@ -1179,7 +1540,9 @@ def dashboard():
     obras = obras_query.all()
 
 
-    total_obras = len(obras)
+    total_obras = len(
+        obras
+    )
 
 
     obras_ativas = sum(
@@ -1211,21 +1574,37 @@ def dashboard():
     # SOLICITAÇÕES PENDENTES
     # --------------------------------------------------------
 
-    solicitacoes_pendentes = Solicitacao.query.join(
-        Obra,
-        Solicitacao.obra_id == Obra.id
-    ).filter(
-        Obra.empresa_id == usuario.empresa_id,
-        Solicitacao.status == "pendente"
-    ).count()
+    if usuario.empresa_id:
+
+        solicitacoes_pendentes = (
+            Solicitacao.query
+            .join(
+                Obra,
+                Solicitacao.obra_id == Obra.id
+            )
+            .filter(
+                Obra.empresa_id == usuario.empresa_id,
+                Solicitacao.status == "pendente"
+            )
+            .count()
+        )
+
+    else:
+
+        solicitacoes_pendentes = 0
 
 
     return render_template(
         "dashboard.html",
+
         total_obras=total_obras,
+
         obras_ativas=obras_ativas,
+
         total_materiais=total_materiais,
+
         materiais_baixos=materiais_baixos,
+
         solicitacoes_pendentes=solicitacoes_pendentes
     )
 
