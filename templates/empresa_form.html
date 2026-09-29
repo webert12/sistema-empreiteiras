@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }} - Construtora Pro{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+
+        <div>
+            <div class="text-muted small mb-1">
+                <i class="bi bi-building"></i> Administração
+            </div>
+
+            <h2 class="fw-bold mb-1">
+                {{ titulo }}
+            </h2>
+
+            <p class="text-muted mb-0">
+                Cadastre e mantenha os dados da empresa.
+            </p>
+        </div>
+
+        <a href="{{ url_for('admin') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+            Voltar
+        </a>
+
+    </div>
+
+
+    <div class="row justify-content-center">
+
+        <div class="col-xl-9 col-lg-10">
+
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body p-4 p-lg-5">
+
+                    <form method="POST">
+
+                        <div class="row g-4">
+
+                            <div class="col-md-8">
+
+                                <label class="form-label fw-semibold">
+                                    Razão Social
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="razao_social"
+                                    class="form-control form-control-lg"
+                                    value="{{ empresa.razao_social if empresa else '' }}"
+                                    placeholder="Ex.: Construtora Silva Ltda."
+                                    required
+                                >
+
+                            </div>
+
+
+                            <div class="col-md-4">
+
+                                <label class="form-label fw-semibold">
+                                    CNPJ
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="cnpj"
+                                    class="form-control form-control-lg"
+                                    value="{{ empresa.cnpj if empresa else '' }}"
+                                    placeholder="00.000.000/0001-00"
+                                >
+
+                            </div>
+
+
+                            <div class="col-md-8">
+
+                                <label class="form-label fw-semibold">
+                                    Nome Fantasia
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="nome_fantasia"
+                                    class="form-control form-control-lg"
+                                    value="{{ empresa.nome_fantasia if empresa else '' }}"
+                                    placeholder="Nome comercial da empresa"
+                                >
+
+                            </div>
+
+
+                            <div class="col-md-4">
+
+                                <label class="form-label fw-semibold">
+                                    Telefone
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="telefone"
+                                    class="form-control form-control-lg"
+                                    value="{{ empresa.telefone if empresa else '' }}"
+                                    placeholder="(00) 00000-0000"
+                                >
+
+                            </div>
+
+
+                            <div class="col-md-6">
+
+                                <label class="form-label fw-semibold">
+                                    E-mail
+                                </label>
+
+                                <input
+                                    type="email"
+                                    name="email"
+                                    class="form-control form-control-lg"
+                                    value="{{ empresa.email if empresa else '' }}"
+                                    placeholder="empresa@email.com"
+                                >
+
+                            </div>
+
+
+                            <div class="col-md-6">
+
+                                <label class="form-label fw-semibold">
+                                    Endereço
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="endereco"
+                                    class="form-control form-control-lg"
+                                    value="{{ empresa.endereco if empresa else '' }}"
+                                    placeholder="Rua, número, cidade..."
+                                >
+
+                            </div>
+
+
+                            {% if empresa %}
+
+                            <div class="col-12">
+
+                                <div class="form-check form-switch">
+
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        name="ativo"
+                                        id="ativo"
+                                        {% if empresa.ativo %}checked{% endif %}
+                                    >
+
+                                    <label class="form-check-label fw-semibold" for="ativo">
+                                        Empresa ativa
+                                    </label>
+
+                                </div>
+
+                                <div class="form-text">
+                                    Empresas desativadas não poderão utilizar normalmente o sistema.
+                                </div>
+
+                            </div>
+
+                            {% endif %}
+
+
+                            <div class="col-12">
+
+                                <hr class="my-2">
+
+                            </div>
+
+
+                            <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
+
+                                <a
+                                    href="{{ url_for('admin') }}"
+                                    class="btn btn-outline-secondary px-4"
+                                >
+                                    Cancelar
+                                </a>
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary px-4"
+                                >
+                                    <i class="bi bi-check-lg"></i>
+
+                                    {% if empresa %}
+                                        Salvar alterações
+                                    {% else %}
+                                        Criar empresa
+                                    {% endif %}
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
