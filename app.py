@@ -214,6 +214,7 @@ def obras_do_usuario(usuario=None):
         return []
 
     if usuario.funcao == "adm":
+
         return Obra.query.order_by(
             Obra.criado_em.desc()
         ).all()
@@ -222,6 +223,7 @@ def obras_do_usuario(usuario=None):
         "administrador_empresa",
         "admin_empresa",
     ):
+
         return Obra.query.filter_by(
             empresa_id=usuario.empresa_id
         ).order_by(
@@ -268,29 +270,36 @@ def empresa_admin_obrigatorio(func):
     def decorated_function(*args, **kwargs):
 
         if not current_user.is_authenticated:
+
             flash(
                 "Faça login para acessar esta página.",
                 "warning"
             )
+
             return redirect(
                 url_for("login")
             )
 
         if not current_user.ativo:
+
             logout_user()
+
             flash(
                 "Seu usuário está inativo.",
                 "danger"
             )
+
             return redirect(
                 url_for("login")
             )
 
         if not eh_gestor_empresa():
+
             flash(
                 "Você não possui permissão para esta função.",
                 "danger"
             )
+
             return redirect(
                 url_for("dashboard")
             )
@@ -299,12 +308,14 @@ def empresa_admin_obrigatorio(func):
             not eh_administrador()
             and current_user.empresa_id
         ):
+
             empresa = db.session.get(
                 Empresa,
                 current_user.empresa_id
             )
 
             if not empresa or not empresa.ativo:
+
                 logout_user()
 
                 flash(
@@ -326,15 +337,18 @@ def login_obrigatorio(func):
     def decorated_function(*args, **kwargs):
 
         if not current_user.is_authenticated:
+
             flash(
                 "Faça login para acessar esta página.",
                 "warning"
             )
+
             return redirect(
                 url_for("login")
             )
 
         if not current_user.ativo:
+
             logout_user()
 
             flash(
@@ -352,6 +366,7 @@ def login_obrigatorio(func):
         empresa = empresa_usuario_atual()
 
         if not empresa or not empresa.ativo:
+
             logout_user()
 
             flash(
@@ -375,6 +390,7 @@ def admin_obrigatorio(func):
     def decorated_function(*args, **kwargs):
 
         if not eh_administrador():
+
             flash(
                 "Acesso permitido somente ao ADM geral.",
                 "danger"
@@ -394,6 +410,7 @@ def admin_obrigatorio(func):
 # ============================================================
 
 class Empresa(db.Model):
+
     __tablename__ = "empresas"
 
     id = db.Column(
@@ -454,6 +471,7 @@ class Empresa(db.Model):
 
 
 class Usuario(UserMixin, db.Model):
+
     __tablename__ = "usuarios"
 
     id = db.Column(
@@ -502,16 +520,26 @@ class Usuario(UserMixin, db.Model):
 
     solicitacoes = db.relationship(
         "Solicitacao",
+        foreign_keys="Solicitacao.usuario_id",
         backref="solicitante",
         lazy=True
     )
 
+    solicitacoes_confirmadas = db.relationship(
+        "Solicitacao",
+        foreign_keys="Solicitacao.confirmado_por_id",
+        backref="confirmado_por",
+        lazy=True
+    )
+
     def definir_senha(self, senha):
+
         self.senha_hash = generate_password_hash(
             senha
         )
 
     def verificar_senha(self, senha):
+
         return check_password_hash(
             self.senha_hash,
             senha
@@ -519,6 +547,7 @@ class Usuario(UserMixin, db.Model):
 
 
 class Obra(db.Model):
+
     __tablename__ = "obras"
 
     id = db.Column(
@@ -586,17 +615,12 @@ class Obra(db.Model):
         cascade="all, delete-orphan"
     )
 
+    @property
+    def equipe(self):
+        return self.vinculos_usuarios
+
 
 class UsuarioObra(db.Model):
-    """
-    Relação entre funcionário e obra.
-
-    Um funcionário pode trabalhar em várias obras.
-    Uma obra pode possuir vários funcionários.
-
-    Para pedreiro/ajudante também podemos criar
-    uma conta compartilhada da equipe.
-    """
 
     __tablename__ = "usuario_obras"
 
@@ -646,6 +670,7 @@ class UsuarioObra(db.Model):
 
 
 class Material(db.Model):
+
     __tablename__ = "materiais"
 
     id = db.Column(
@@ -701,6 +726,7 @@ class Material(db.Model):
 
 
 class Ferramenta(db.Model):
+
     __tablename__ = "ferramentas"
 
     id = db.Column(
@@ -750,6 +776,7 @@ class Ferramenta(db.Model):
 
 
 class Solicitacao(db.Model):
+
     __tablename__ = "solicitacoes"
 
     id = db.Column(
@@ -769,16 +796,9 @@ class Solicitacao(db.Model):
         nullable=True
     )
 
-    # ========================================================
-    # NOVO:
-    # Uma solicitação agora também pode ser de ferramenta.
-    #
-    # A coluna será criada automaticamente pela função
-    # de migração abaixo caso o banco antigo ainda não tenha.
-    # ========================================================
-
     ferramenta_id = db.Column(
         db.Integer,
+        db.ForeignKey("ferramentas.id"),
         nullable=True
     )
 
@@ -808,18 +828,24 @@ class Solicitacao(db.Model):
         default=datetime.utcnow
     )
 
-    # ========================================================
-    # CONTROLE DA CONFIRMAÇÃO PELO ADM
-    # ========================================================
-
     confirmado_por_id = db.Column(
         db.Integer,
+        db.ForeignKey("usuarios.id"),
         nullable=True
     )
 
     confirmado_em = db.Column(
         db.DateTime,
         nullable=True
+    )
+
+    ferramenta = db.relationship(
+        "Ferramenta",
+        backref=db.backref(
+            "solicitacoes",
+            lazy=True
+        ),
+        lazy=True
     )
 
 
@@ -829,15 +855,19 @@ class Solicitacao(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
+
     try:
+
         return db.session.get(
             Usuario,
             int(user_id)
         )
+
     except (
         ValueError,
         TypeError
     ):
+
         return None
 
 
@@ -862,6 +892,7 @@ def injetar_contexto():
         "funcoes_funcionarios": FUNCOES_FUNCIONARIOS,
         "status_obras": STATUS_OBRA,
         "status_solicitacoes": STATUS_SOLICITACAO,
+        "now": datetime.now,
     }
 
 
@@ -869,10 +900,14 @@ def injetar_contexto():
 # LOGIN
 # ============================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if current_user.is_authenticated:
+
         return redirect(
             url_for("dashboard")
         )
@@ -893,6 +928,7 @@ def login():
         ).first()
 
         if not usuario:
+
             flash(
                 "Usuário ou senha inválidos.",
                 "danger"
@@ -903,6 +939,7 @@ def login():
             )
 
         if not usuario.ativo:
+
             flash(
                 "Este usuário está inativo.",
                 "danger"
@@ -913,6 +950,7 @@ def login():
             )
 
         if not usuario.verificar_senha(senha):
+
             flash(
                 "Usuário ou senha inválidos.",
                 "danger"
@@ -921,10 +959,6 @@ def login():
             return render_template(
                 "login.html"
             )
-
-        # ----------------------------------------------------
-        # ADM GERAL
-        # ----------------------------------------------------
 
         if usuario.funcao == "adm":
 
@@ -938,10 +972,6 @@ def login():
             return redirect(
                 url_for("admin_dashboard")
             )
-
-        # ----------------------------------------------------
-        # USUÁRIO DE EMPRESA
-        # ----------------------------------------------------
 
         empresa = db.session.get(
             Empresa,
@@ -967,8 +997,6 @@ def login():
             "success"
         )
 
-        # Se for uma conta compartilhada da obra,
-        # leva diretamente para a obra.
         if usuario.funcao == "equipe_obra":
 
             vinculo = UsuarioObra.query.filter_by(
@@ -1006,6 +1034,58 @@ def logout():
 
     return redirect(
         url_for("login")
+    )
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+
+@app.route("/")
+@login_obrigatorio
+def dashboard():
+
+    if eh_administrador():
+
+        empresas_count = Empresa.query.count()
+        obras_count = Obra.query.count()
+        usuarios_count = Usuario.query.count()
+        solicitacoes_pendentes = Solicitacao.query.filter_by(
+            status="pendente"
+        ).count()
+
+        return render_template(
+            "dashboard.html",
+            empresas_count=empresas_count,
+            obras_count=obras_count,
+            usuarios_count=usuarios_count,
+            solicitacoes_pendentes=solicitacoes_pendentes,
+        )
+
+    empresa = empresa_usuario_atual()
+
+    obras_count = Obra.query.filter_by(
+        empresa_id=empresa.id
+    ).count()
+
+    usuarios_count = Usuario.query.filter_by(
+        empresa_id=empresa.id
+    ).count()
+
+    solicitacoes_pendentes = Solicitacao.query.join(
+        Obra,
+        Solicitacao.obra_id == Obra.id
+    ).filter(
+        Obra.empresa_id == empresa.id,
+        Solicitacao.status == "pendente"
+    ).count()
+
+    return render_template(
+        "dashboard.html",
+        empresa=empresa,
+        obras_count=obras_count,
+        usuarios_count=usuarios_count,
+        solicitacoes_pendentes=solicitacoes_pendentes,
     )
 
 
@@ -1114,6 +1194,7 @@ def nova_empresa():
         db.session.add(empresa)
 
         try:
+
             db.session.commit()
 
             flash(
@@ -1241,6 +1322,7 @@ def editar_empresa(empresa_id):
         ).strip()
 
         try:
+
             db.session.commit()
 
             flash(
@@ -1490,9 +1572,17 @@ def novo_usuario_empresa(empresa_id):
 
             for obra_id in obra_ids:
 
+                try:
+                    obra_id_int = int(obra_id)
+                except (
+                    ValueError,
+                    TypeError
+                ):
+                    continue
+
                 obra = db.session.get(
                     Obra,
-                    int(obra_id)
+                    obra_id_int
                 )
 
                 if not obra:
@@ -1501,13 +1591,13 @@ def novo_usuario_empresa(empresa_id):
                 if obra.empresa_id != empresa.id:
                     continue
 
-                vinculo = UsuarioObra(
-                    usuario_id=funcionario.id,
-                    obra_id=obra.id,
-                    funcao_na_obra=funcao,
+                db.session.add(
+                    UsuarioObra(
+                        usuario_id=funcionario.id,
+                        obra_id=obra.id,
+                        funcao_na_obra=funcao,
+                    )
                 )
-
-                db.session.add(vinculo)
 
             db.session.commit()
 
@@ -1517,9 +1607,7 @@ def novo_usuario_empresa(empresa_id):
             )
 
             return redirect(
-                url_for(
-                    "funcionarios"
-                )
+                url_for("funcionarios")
             )
 
         except Exception:
@@ -1559,12 +1647,14 @@ def funcionarios():
         )
 
         if empresa_id:
+
             empresa = db.session.get(
                 Empresa,
                 empresa_id
             )
 
             if empresa:
+
                 usuarios = Usuario.query.filter_by(
                     empresa_id=empresa.id
                 ).order_by(
@@ -1634,6 +1724,7 @@ def novo_funcionario():
         )
 
         if not empresa_id:
+
             empresas = Empresa.query.filter_by(
                 ativo=True
             ).order_by(
@@ -1731,6 +1822,17 @@ def editar_funcionario(usuario_id):
         funcionario.empresa_id
     )
 
+    if not empresa:
+
+        flash(
+            "Empresa do funcionário não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("funcionarios")
+        )
+
     obras = Obra.query.filter_by(
         empresa_id=empresa.id
     ).order_by(
@@ -1791,11 +1893,28 @@ def editar_funcionario(usuario_id):
                 titulo="Editar funcionário"
             )
 
+        if not nome or not usuario_login:
+
+            flash(
+                "Nome e usuário são obrigatórios.",
+                "danger"
+            )
+
+            return render_template(
+                "funcionario_form.html",
+                funcionario=funcionario,
+                empresa=empresa,
+                obras=obras,
+                obras_selecionadas=obras_selecionadas,
+                titulo="Editar funcionário"
+            )
+
         funcionario.nome = nome
         funcionario.usuario = usuario_login
         funcionario.funcao = funcao
 
         if senha.strip():
+
             funcionario.definir_senha(
                 senha
             )
@@ -1814,9 +1933,17 @@ def editar_funcionario(usuario_id):
 
             for obra_id in obra_ids:
 
+                try:
+                    obra_id_int = int(obra_id)
+                except (
+                    ValueError,
+                    TypeError
+                ):
+                    continue
+
                 obra = db.session.get(
                     Obra,
-                    int(obra_id)
+                    obra_id_int
                 )
 
                 if not obra:
@@ -1975,6 +2102,7 @@ def nova_obra():
         )
 
         if not eh_administrador():
+
             empresa_id = current_user.empresa_id
 
         empresa = db.session.get(
@@ -1982,10 +2110,10 @@ def nova_obra():
             empresa_id
         )
 
-        if not empresa:
+        if not empresa or not empresa.ativo:
 
             flash(
-                "Empresa inválida.",
+                "Empresa inválida ou inativa.",
                 "danger"
             )
 
@@ -2024,22 +2152,36 @@ def nova_obra():
         )
 
         if data_inicio_raw:
+
             try:
+
                 data_inicio = datetime.strptime(
                     data_inicio_raw,
                     "%Y-%m-%d"
                 ).date()
+
             except ValueError:
                 pass
 
         if previsao_raw:
+
             try:
+
                 previsao_termino = datetime.strptime(
                     previsao_raw,
                     "%Y-%m-%d"
                 ).date()
+
             except ValueError:
                 pass
+
+        status = (
+            request.form.get("status")
+            or "planejamento"
+        ).strip()
+
+        if status not in STATUS_OBRA:
+            status = "planejamento"
 
         obra = Obra(
             empresa_id=empresa.id,
@@ -2058,10 +2200,7 @@ def nova_obra():
             ).strip(),
             data_inicio=data_inicio,
             previsao_termino=previsao_termino,
-            status=(
-                request.form.get("status")
-                or "planejamento"
-            ),
+            status=status,
             observacoes=(
                 request.form.get("observacoes")
                 or ""
@@ -2069,7 +2208,30 @@ def nova_obra():
         )
 
         db.session.add(obra)
-        db.session.commit()
+
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao cadastrar obra"
+            )
+
+            flash(
+                "Não foi possível cadastrar a obra.",
+                "danger"
+            )
+
+            return render_template(
+                "obra_form.html",
+                obra=None,
+                empresas=empresas,
+                titulo="Nova obra"
+            )
 
         flash(
             "Obra cadastrada com sucesso.",
@@ -2097,7 +2259,9 @@ def nova_obra():
 @login_obrigatorio
 def obra_detalhes(obra_id):
 
-    obra = obter_obra(obra_id)
+    obra = obter_obra(
+        obra_id
+    )
 
     if not obra:
 
@@ -2139,6 +2303,7 @@ def obra_detalhes(obra_id):
     for vinculo in vinculos:
 
         if vinculo.usuario.funcao == "equipe_obra":
+
             equipe_acesso = vinculo.usuario
             break
 
@@ -2158,7 +2323,9 @@ def obra_detalhes(obra_id):
 @empresa_admin_obrigatorio
 def editar_obra(obra_id):
 
-    obra = obter_obra(obra_id)
+    obra = obter_obra(
+        obra_id
+    )
 
     if not obra:
 
@@ -2201,8 +2368,11 @@ def editar_obra(obra_id):
     if request.method == "POST":
 
         if not eh_administrador():
+
             empresa_id = current_user.empresa_id
+
         else:
+
             empresa_id = request.form.get(
                 "empresa_id",
                 type=int
@@ -2213,10 +2383,10 @@ def editar_obra(obra_id):
             empresa_id
         )
 
-        if not empresa:
+        if not empresa or not empresa.ativo:
 
             flash(
-                "Empresa inválida.",
+                "Empresa inválida ou inativa.",
                 "danger"
             )
 
@@ -2227,12 +2397,28 @@ def editar_obra(obra_id):
                 )
             )
 
-        obra.empresa_id = empresa.id
-
-        obra.nome = (
+        nome = (
             request.form.get("nome")
             or ""
         ).strip()
+
+        if not nome:
+
+            flash(
+                "O nome da obra é obrigatório.",
+                "danger"
+            )
+
+            return render_template(
+                "obra_form.html",
+                obra=obra,
+                empresas=empresas,
+                titulo="Editar obra"
+            )
+
+        obra.empresa_id = empresa.id
+
+        obra.nome = nome
 
         obra.cliente = (
             request.form.get("cliente")
@@ -2249,10 +2435,13 @@ def editar_obra(obra_id):
             or ""
         ).strip()
 
-        obra.status = (
+        status = (
             request.form.get("status")
             or obra.status
-        )
+        ).strip()
+
+        if status in STATUS_OBRA:
+            obra.status = status
 
         obra.observacoes = (
             request.form.get("observacoes")
@@ -2268,28 +2457,68 @@ def editar_obra(obra_id):
         )
 
         if data_inicio_raw:
+
             try:
+
                 obra.data_inicio = datetime.strptime(
                     data_inicio_raw,
                     "%Y-%m-%d"
                 ).date()
+
             except ValueError:
-                pass
+
+                flash(
+                    "Data de início inválida.",
+                    "warning"
+                )
+
         else:
+
             obra.data_inicio = None
 
         if previsao_raw:
+
             try:
+
                 obra.previsao_termino = datetime.strptime(
                     previsao_raw,
                     "%Y-%m-%d"
                 ).date()
+
             except ValueError:
-                pass
+
+                flash(
+                    "Previsão de término inválida.",
+                    "warning"
+                )
+
         else:
+
             obra.previsao_termino = None
 
-        db.session.commit()
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao editar obra"
+            )
+
+            flash(
+                "Não foi possível atualizar a obra.",
+                "danger"
+            )
+
+            return render_template(
+                "obra_form.html",
+                obra=obra,
+                empresas=empresas,
+                titulo="Editar obra"
+            )
 
         flash(
             "Obra atualizada com sucesso.",
@@ -2318,7 +2547,9 @@ def editar_obra(obra_id):
 @empresa_admin_obrigatorio
 def finalizar_obra(obra_id):
 
-    obra = obter_obra(obra_id)
+    obra = obter_obra(
+        obra_id
+    )
 
     if not obra:
 
@@ -2382,7 +2613,9 @@ def finalizar_obra(obra_id):
 @empresa_admin_obrigatorio
 def excluir_obra(obra_id):
 
-    obra = obter_obra(obra_id)
+    obra = obter_obra(
+        obra_id
+    )
 
     if not obra:
 
@@ -2408,8 +2641,6 @@ def excluir_obra(obra_id):
             url_for("obras")
         )
 
-    # Para evitar apagar histórico de solicitações,
-    # bloqueamos a exclusão quando já existem solicitações.
     if Solicitacao.query.filter_by(
         obra_id=obra.id
     ).first():
@@ -2434,7 +2665,30 @@ def excluir_obra(obra_id):
     )
 
     db.session.delete(obra)
-    db.session.commit()
+
+    try:
+
+        db.session.commit()
+
+    except Exception:
+
+        db.session.rollback()
+
+        logging.exception(
+            "Erro ao excluir obra"
+        )
+
+        flash(
+            "Não foi possível excluir a obra.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "obra_detalhes",
+                obra_id=obra.id
+            )
+        )
 
     flash(
         "Obra excluída com sucesso.",
@@ -2457,7 +2711,9 @@ def excluir_obra(obra_id):
 @empresa_admin_obrigatorio
 def salvar_acesso_equipe(obra_id):
 
-    obra = obter_obra(obra_id)
+    obra = obter_obra(
+        obra_id
+    )
 
     if not obra:
 
@@ -2520,6 +2776,7 @@ def salvar_acesso_equipe(obra_id):
     for vinculo in vinculos:
 
         if vinculo.usuario.funcao == "equipe_obra":
+
             equipe_existente = vinculo.usuario
             break
 
@@ -2554,6 +2811,7 @@ def salvar_acesso_equipe(obra_id):
         equipe_existente.usuario = usuario_login
 
         if senha.strip():
+
             equipe_existente.definir_senha(
                 senha
             )
@@ -2597,17 +2855,39 @@ def salvar_acesso_equipe(obra_id):
             novo_usuario
         )
 
-        db.session.flush()
+        try:
 
-        db.session.add(
-            UsuarioObra(
-                usuario_id=novo_usuario.id,
-                obra_id=obra.id,
-                funcao_na_obra="equipe_obra",
+            db.session.flush()
+
+            db.session.add(
+                UsuarioObra(
+                    usuario_id=novo_usuario.id,
+                    obra_id=obra.id,
+                    funcao_na_obra="equipe_obra",
+                )
             )
-        )
 
-        db.session.commit()
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao criar acesso da equipe"
+            )
+
+            flash(
+                "Não foi possível criar o acesso da equipe.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "obra_detalhes",
+                    obra_id=obra.id
+                )
+            )
 
         flash(
             "Acesso compartilhado da equipe criado.",
@@ -2673,6 +2953,7 @@ def novo_material():
         ).strip()
 
         try:
+
             estoque_minimo = float(
                 request.form.get(
                     "estoque_minimo",
@@ -2689,7 +2970,10 @@ def novo_material():
                 or 0
             )
 
-        except ValueError:
+        except (
+            ValueError,
+            TypeError
+        ):
 
             estoque_minimo = 0
             estoque_atual = 0
@@ -2718,7 +3002,29 @@ def novo_material():
         )
 
         db.session.add(material)
-        db.session.commit()
+
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao cadastrar material"
+            )
+
+            flash(
+                "Não foi possível cadastrar o material.",
+                "danger"
+            )
+
+            return render_template(
+                "material_form.html",
+                material=None,
+                titulo="Novo material"
+            )
 
         flash(
             "Material cadastrado com sucesso.",
@@ -2787,6 +3093,7 @@ def nova_ferramenta():
         ).strip()
 
         try:
+
             estoque_minimo = float(
                 request.form.get(
                     "estoque_minimo",
@@ -2803,7 +3110,10 @@ def nova_ferramenta():
                 or 0
             )
 
-        except ValueError:
+        except (
+            ValueError,
+            TypeError
+        ):
 
             estoque_minimo = 0
             estoque_atual = 0
@@ -2832,7 +3142,29 @@ def nova_ferramenta():
         )
 
         db.session.add(ferramenta)
-        db.session.commit()
+
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao cadastrar ferramenta"
+            )
+
+            flash(
+                "Não foi possível cadastrar a ferramenta.",
+                "danger"
+            )
+
+            return render_template(
+                "ferramenta_form.html",
+                ferramenta=None,
+                titulo="Nova ferramenta"
+            )
 
         flash(
             "Ferramenta cadastrada com sucesso.",
@@ -3001,14 +3333,23 @@ def nova_solicitacao():
             )
 
             return redirect(
-                url_for("obra_detalhes", obra_id=obra.id)
+                url_for(
+                    "obra_detalhes",
+                    obra_id=obra.id
+                )
             )
 
         try:
+
             quantidade = float(
                 quantidade_raw
             )
-        except ValueError:
+
+        except (
+            ValueError,
+            TypeError
+        ):
+
             quantidade = 0
 
         if quantidade <= 0:
@@ -3032,6 +3373,17 @@ def nova_solicitacao():
 
             flash(
                 "Tipo de recurso inválido.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("nova_solicitacao")
+            )
+
+        if not recurso_id:
+
+            flash(
+                "Selecione um material ou ferramenta.",
                 "danger"
             )
 
@@ -3088,7 +3440,27 @@ def nova_solicitacao():
             nova.material_id = None
 
         db.session.add(nova)
-        db.session.commit()
+
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao criar solicitação"
+            )
+
+            flash(
+                "Não foi possível enviar a solicitação.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("nova_solicitacao")
+            )
 
         flash(
             "Solicitação enviada para aprovação do ADM.",
@@ -3163,10 +3535,6 @@ def confirmar_solicitacao(solicitacao_id):
             url_for("solicitacoes")
         )
 
-    # ========================================================
-    # PROTEÇÃO CONTRA DUPLA CONFIRMAÇÃO
-    # ========================================================
-
     if solicitacao.status == "confirmado":
 
         flash(
@@ -3190,10 +3558,6 @@ def confirmar_solicitacao(solicitacao_id):
             url_for("solicitacoes")
         )
 
-    # ========================================================
-    # MATERIAL
-    # ========================================================
-
     if solicitacao.material_id:
 
         material = obter_material(
@@ -3215,10 +3579,6 @@ def confirmar_solicitacao(solicitacao_id):
             float(material.estoque_atual or 0)
             + float(solicitacao.quantidade or 0)
         )
-
-    # ========================================================
-    # FERRAMENTA
-    # ========================================================
 
     elif solicitacao.ferramenta_id:
 
@@ -3263,7 +3623,26 @@ def confirmar_solicitacao(solicitacao_id):
         datetime.utcnow()
     )
 
-    db.session.commit()
+    try:
+
+        db.session.commit()
+
+    except Exception:
+
+        db.session.rollback()
+
+        logging.exception(
+            "Erro ao confirmar solicitação"
+        )
+
+        flash(
+            "Não foi possível confirmar a solicitação.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitacoes")
+        )
 
     flash(
         "Compra confirmada e estoque atualizado com sucesso.",
@@ -3326,6 +3705,17 @@ def marcar_solicitacao_comprada(
         flash(
             "Esta solicitação já foi confirmada.",
             "info"
+        )
+
+        return redirect(
+            url_for("solicitacoes")
+        )
+
+    if solicitacao.status == "cancelado":
+
+        flash(
+            "Esta solicitação está cancelada.",
+            "warning"
         )
 
         return redirect(
@@ -3404,6 +3794,17 @@ def cancelar_solicitacao(
             url_for("solicitacoes")
         )
 
+    if solicitacao.status == "cancelado":
+
+        flash(
+            "Esta solicitação já está cancelada.",
+            "info"
+        )
+
+        return redirect(
+            url_for("solicitacoes")
+        )
+
     solicitacao.status = "cancelado"
 
     db.session.commit()
@@ -3419,7 +3820,7 @@ def cancelar_solicitacao(
 
 
 # ============================================================
-# MIGRAÇÃO SIMPLES DO BANCO EXISTENTE
+# MIGRAÇÃO ROBUSTA DO BANCO
 # ============================================================
 
 def coluna_existe(nome_tabela, nome_coluna):
@@ -3443,6 +3844,21 @@ def coluna_existe(nome_tabela, nome_coluna):
     )
 
 
+def tipo_sql_datetime():
+
+    """
+    PostgreSQL não utiliza DATETIME.
+    SQLite aceita DATETIME.
+    """
+
+    dialect = db.engine.dialect.name
+
+    if dialect == "postgresql":
+        return "TIMESTAMP"
+
+    return "DATETIME"
+
+
 def adicionar_coluna_se_nao_existir(
     tabela,
     coluna,
@@ -3453,24 +3869,40 @@ def adicionar_coluna_se_nao_existir(
         tabela,
         coluna
     ):
-        return
+
+        logging.info(
+            "Coluna já existe: %s.%s",
+            tabela,
+            coluna
+        )
+
+        return True
 
     try:
 
+        comando = (
+            f'ALTER TABLE "{tabela}" '
+            f'ADD COLUMN "{coluna}" {tipo_sql}'
+        )
+
+        logging.info(
+            "Executando migração: %s",
+            comando
+        )
+
         db.session.execute(
-            text(
-                f"ALTER TABLE {tabela} "
-                f"ADD COLUMN {coluna} {tipo_sql}"
-            )
+            text(comando)
         )
 
         db.session.commit()
 
         logging.info(
-            "Coluna adicionada: %s.%s",
+            "Coluna adicionada com sucesso: %s.%s",
             tabela,
             coluna
         )
+
+        return True
 
     except Exception:
 
@@ -3482,18 +3914,211 @@ def adicionar_coluna_se_nao_existir(
             coluna
         )
 
+        return False
+
 
 def migrar_banco():
 
     """
-    O projeto já possui banco.
+    IMPORTANTE:
 
-    db.create_all() não altera tabelas antigas.
-    Por isso adicionamos somente as novas colunas
-    necessárias para as solicitações.
+    db.create_all() NÃO altera tabelas existentes.
 
-    Isso evita apagar os dados existentes.
+    Portanto, esta função verifica as tabelas existentes
+    e adiciona somente colunas que estiverem faltando.
+
+    Nenhuma informação existente é apagada.
     """
+
+    logging.info(
+        "Iniciando verificação/migração do banco..."
+    )
+
+    datetime_type = tipo_sql_datetime()
+
+    # ========================================================
+    # EMPRESAS
+    # ========================================================
+
+    adicionar_coluna_se_nao_existir(
+        "empresas",
+        "criado_em",
+        datetime_type
+    )
+
+    # ========================================================
+    # USUÁRIOS
+    # ========================================================
+
+    adicionar_coluna_se_nao_existir(
+        "usuarios",
+        "criado_em",
+        datetime_type
+    )
+
+    # ========================================================
+    # OBRAS
+    # ========================================================
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "cliente",
+        "VARCHAR(200)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "endereco",
+        "VARCHAR(300)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "responsavel",
+        "VARCHAR(150)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "data_inicio",
+        "DATE"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "previsao_termino",
+        "DATE"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "status",
+        "VARCHAR(50)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "observacoes",
+        "TEXT"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "obras",
+        "criado_em",
+        datetime_type
+    )
+
+    # ========================================================
+    # USUÁRIO X OBRA
+    # ========================================================
+
+    adicionar_coluna_se_nao_existir(
+        "usuario_obras",
+        "funcao_na_obra",
+        "VARCHAR(80)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "usuario_obras",
+        "criado_em",
+        datetime_type
+    )
+
+    # ========================================================
+    # MATERIAIS
+    # ========================================================
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "categoria",
+        "VARCHAR(120)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "descricao",
+        "TEXT"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "unidade",
+        "VARCHAR(30)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "estoque_minimo",
+        "DOUBLE PRECISION"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "estoque_atual",
+        "DOUBLE PRECISION"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "ativo",
+        "BOOLEAN"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "materiais",
+        "criado_em",
+        datetime_type
+    )
+
+    # ========================================================
+    # FERRAMENTAS
+    # ========================================================
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "categoria",
+        "VARCHAR(120)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "descricao",
+        "TEXT"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "unidade",
+        "VARCHAR(30)"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "estoque_minimo",
+        "DOUBLE PRECISION"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "estoque_atual",
+        "DOUBLE PRECISION"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "ativo",
+        "BOOLEAN"
+    )
+
+    adicionar_coluna_se_nao_existir(
+        "ferramentas",
+        "criado_em",
+        datetime_type
+    )
+
+    # ========================================================
+    # SOLICITAÇÕES
+    # ========================================================
 
     adicionar_coluna_se_nao_existir(
         "solicitacoes",
@@ -3510,7 +4135,11 @@ def migrar_banco():
     adicionar_coluna_se_nao_existir(
         "solicitacoes",
         "confirmado_em",
-        "DATETIME"
+        datetime_type
+    )
+
+    logging.info(
+        "Verificação/migração do banco concluída."
     )
 
 
@@ -3520,351 +4149,459 @@ def migrar_banco():
 
 FERRAMENTAS_INICIAIS = [
 
-    # --------------------------------------------------------
     # MEDIÇÃO
-    # --------------------------------------------------------
 
-    ("Medição",
-     "Trena 5 metros",
-     "Trena profissional de 5 metros",
-     "un"),
+    (
+        "Medição",
+        "Trena 5 metros",
+        "Trena profissional de 5 metros",
+        "un"
+    ),
 
-    ("Medição",
-     "Trena 10 metros",
-     "Trena profissional de 10 metros",
-     "un"),
+    (
+        "Medição",
+        "Trena 10 metros",
+        "Trena profissional de 10 metros",
+        "un"
+    ),
 
-    ("Medição",
-     "Nível de bolha",
-     "Nível manual para conferência",
-     "un"),
+    (
+        "Medição",
+        "Nível de bolha",
+        "Nível manual para conferência",
+        "un"
+    ),
 
-    ("Medição",
-     "Nível a laser",
-     "Nível a laser para alinhamento e nivelamento",
-     "un"),
+    (
+        "Medição",
+        "Nível a laser",
+        "Nível a laser para alinhamento e nivelamento",
+        "un"
+    ),
 
-    ("Medição",
-     "Esquadro",
-     "Esquadro para construção",
-     "un"),
+    (
+        "Medição",
+        "Esquadro",
+        "Esquadro para construção",
+        "un"
+    ),
 
-    ("Medição",
-     "Prumo",
-     "Prumo de face para conferência vertical",
-     "un"),
+    (
+        "Medição",
+        "Prumo",
+        "Prumo de face para conferência vertical",
+        "un"
+    ),
 
-    ("Medição",
-     "Linha de pedreiro",
-     "Linha para alinhamento de paredes",
-     "un"),
+    (
+        "Medição",
+        "Linha de pedreiro",
+        "Linha para alinhamento de paredes",
+        "un"
+    ),
 
-    ("Medição",
-     "Mangueira de nível",
-     "Mangueira transparente para nivelamento",
-     "un"),
+    (
+        "Medição",
+        "Mangueira de nível",
+        "Mangueira transparente para nivelamento",
+        "un"
+    ),
 
-    # --------------------------------------------------------
     # ALVENARIA
-    # --------------------------------------------------------
 
-    ("Alvenaria",
-     "Colher de pedreiro",
-     "Colher para aplicação de argamassa",
-     "un"),
+    (
+        "Alvenaria",
+        "Colher de pedreiro",
+        "Colher para aplicação de argamassa",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Desempenadeira lisa",
-     "Desempenadeira para acabamento",
-     "un"),
+    (
+        "Alvenaria",
+        "Desempenadeira lisa",
+        "Desempenadeira para acabamento",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Desempenadeira dentada",
-     "Desempenadeira para aplicação de argamassa",
-     "un"),
+    (
+        "Alvenaria",
+        "Desempenadeira dentada",
+        "Desempenadeira para aplicação de argamassa",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Espátula",
-     "Espátula para aplicação e acabamento",
-     "un"),
+    (
+        "Alvenaria",
+        "Espátula",
+        "Espátula para aplicação e acabamento",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Talhadeira",
-     "Talhadeira para trabalhos em alvenaria",
-     "un"),
+    (
+        "Alvenaria",
+        "Talhadeira",
+        "Talhadeira para trabalhos em alvenaria",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Ponteiro",
-     "Ponteiro para quebra e perfuração",
-     "un"),
+    (
+        "Alvenaria",
+        "Ponteiro",
+        "Ponteiro para quebra e perfuração",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Marreta",
-     "Marreta para demolição e alvenaria",
-     "un"),
+    (
+        "Alvenaria",
+        "Marreta",
+        "Marreta para demolição e alvenaria",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Martelo de pedreiro",
-     "Martelo para trabalhos de alvenaria",
-     "un"),
+    (
+        "Alvenaria",
+        "Martelo de pedreiro",
+        "Martelo para trabalhos de alvenaria",
+        "un"
+    ),
 
-    ("Alvenaria",
-     "Régua de alumínio",
-     "Régua para regularização",
-     "un"),
+    (
+        "Alvenaria",
+        "Régua de alumínio",
+        "Régua para regularização",
+        "un"
+    ),
 
-    # --------------------------------------------------------
-    # CORTE / MANUAL
-    # --------------------------------------------------------
+    # FERRAMENTAS MANUAIS
 
-    ("Ferramentas manuais",
-     "Serrote",
-     "Serrote para cortes em madeira",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Serrote",
+        "Serrote para cortes em madeira",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Arco de serra",
-     "Arco manual para cortes",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Arco de serra",
+        "Arco manual para cortes",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Formão",
-     "Formão para madeira",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Formão",
+        "Formão para madeira",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Lima",
-     "Lima para acabamento",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Lima",
+        "Lima para acabamento",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Alicate universal",
-     "Alicate para serviços gerais",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Alicate universal",
+        "Alicate para serviços gerais",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Alicate de corte",
-     "Alicate para cortes",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Alicate de corte",
+        "Alicate para cortes",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Chave de fenda",
-     "Chave de fenda para serviços gerais",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Chave de fenda",
+        "Chave de fenda para serviços gerais",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Chave Phillips",
-     "Chave Phillips",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Chave Phillips",
+        "Chave Phillips",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Chave inglesa",
-     "Chave ajustável",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Chave inglesa",
+        "Chave ajustável",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Chave grifo",
-     "Chave para tubulações",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Chave grifo",
+        "Chave para tubulações",
+        "un"
+    ),
 
-    ("Ferramentas manuais",
-     "Torquês",
-     "Torquês para corte e dobra",
-     "un"),
+    (
+        "Ferramentas manuais",
+        "Torquês",
+        "Torquês para corte e dobra",
+        "un"
+    ),
 
-    # --------------------------------------------------------
-    # TERRAPLANAGEM / SERVIÇO PESADO
-    # --------------------------------------------------------
+    # SERVIÇO PESADO
 
-    ("Serviço pesado",
-     "Pá de bico",
-     "Pá para escavação",
-     "un"),
+    (
+        "Serviço pesado",
+        "Pá de bico",
+        "Pá para escavação",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Pá quadrada",
-     "Pá para movimentação de materiais",
-     "un"),
+    (
+        "Serviço pesado",
+        "Pá quadrada",
+        "Pá para movimentação de materiais",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Enxada",
-     "Enxada para escavação e limpeza",
-     "un"),
+    (
+        "Serviço pesado",
+        "Enxada",
+        "Enxada para escavação e limpeza",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Picareta",
-     "Picareta para escavação",
-     "un"),
+    (
+        "Serviço pesado",
+        "Picareta",
+        "Picareta para escavação",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Cavadeira",
-     "Cavadeira manual",
-     "un"),
+    (
+        "Serviço pesado",
+        "Cavadeira",
+        "Cavadeira manual",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Carrinho de mão",
-     "Carrinho para transporte de materiais",
-     "un"),
+    (
+        "Serviço pesado",
+        "Carrinho de mão",
+        "Carrinho para transporte de materiais",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Balde de obra",
-     "Balde para transporte de materiais",
-     "un"),
+    (
+        "Serviço pesado",
+        "Balde de obra",
+        "Balde para transporte de materiais",
+        "un"
+    ),
 
-    ("Serviço pesado",
-     "Peneira de areia",
-     "Peneira para preparação de agregados",
-     "un"),
+    (
+        "Serviço pesado",
+        "Peneira de areia",
+        "Peneira para preparação de agregados",
+        "un"
+    ),
 
-    # --------------------------------------------------------
-    # ELÉTRICAS
-    # --------------------------------------------------------
+    # FERRAMENTAS ELÉTRICAS
 
-    ("Ferramentas elétricas",
-     "Furadeira",
-     "Furadeira elétrica profissional",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Furadeira",
+        "Furadeira elétrica profissional",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Parafusadeira",
-     "Parafusadeira elétrica",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Parafusadeira",
+        "Parafusadeira elétrica",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Martelete",
-     "Martelete para perfuração e demolição",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Martelete",
+        "Martelete para perfuração e demolição",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Esmerilhadeira",
-     "Esmerilhadeira angular",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Esmerilhadeira",
+        "Esmerilhadeira angular",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Serra circular",
-     "Serra circular para madeira",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Serra circular",
+        "Serra circular para madeira",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Serra mármore",
-     "Serra para cortes em materiais de construção",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Serra mármore",
+        "Serra para cortes em materiais de construção",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Serra tico-tico",
-     "Serra elétrica para cortes",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Serra tico-tico",
+        "Serra elétrica para cortes",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Lixadeira",
-     "Lixadeira elétrica",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Lixadeira",
+        "Lixadeira elétrica",
+        "un"
+    ),
 
-    ("Ferramentas elétricas",
-     "Extensão elétrica",
-     "Extensão elétrica para obra",
-     "un"),
+    (
+        "Ferramentas elétricas",
+        "Extensão elétrica",
+        "Extensão elétrica para obra",
+        "un"
+    ),
 
-    # --------------------------------------------------------
     # CONCRETO
-    # --------------------------------------------------------
 
-    ("Concreto",
-     "Vibrador de concreto",
-     "Equipamento para adensamento do concreto",
-     "un"),
+    (
+        "Concreto",
+        "Vibrador de concreto",
+        "Equipamento para adensamento do concreto",
+        "un"
+    ),
 
-    ("Concreto",
-     "Betoneira",
-     "Betoneira para mistura de concreto e argamassa",
-     "un"),
+    (
+        "Concreto",
+        "Betoneira",
+        "Betoneira para mistura de concreto e argamassa",
+        "un"
+    ),
 
-    ("Concreto",
-     "Régua vibratória",
-     "Régua para acabamento de concreto",
-     "un"),
+    (
+        "Concreto",
+        "Régua vibratória",
+        "Régua para acabamento de concreto",
+        "un"
+    ),
 
-    # --------------------------------------------------------
     # ACESSO
-    # --------------------------------------------------------
 
-    ("Acesso",
-     "Escada de alumínio",
-     "Escada para acesso em altura",
-     "un"),
+    (
+        "Acesso",
+        "Escada de alumínio",
+        "Escada para acesso em altura",
+        "un"
+    ),
 
-    ("Acesso",
-     "Escada extensível",
-     "Escada extensível para serviços",
-     "un"),
+    (
+        "Acesso",
+        "Escada extensível",
+        "Escada extensível para serviços",
+        "un"
+    ),
 
-    ("Acesso",
-     "Andaime",
-     "Estrutura modular para trabalho em altura",
-     "un"),
+    (
+        "Acesso",
+        "Andaime",
+        "Estrutura modular para trabalho em altura",
+        "un"
+    ),
 
-    # --------------------------------------------------------
     # ACABAMENTO
-    # --------------------------------------------------------
 
-    ("Acabamento",
-     "Desempenadeira de aço",
-     "Desempenadeira para acabamento",
-     "un"),
+    (
+        "Acabamento",
+        "Desempenadeira de aço",
+        "Desempenadeira para acabamento",
+        "un"
+    ),
 
-    ("Acabamento",
-     "Desempenadeira de PVC",
-     "Desempenadeira para acabamento",
-     "un"),
+    (
+        "Acabamento",
+        "Desempenadeira de PVC",
+        "Desempenadeira para acabamento",
+        "un"
+    ),
 
-    ("Acabamento",
-     "Rolo de pintura",
-     "Rolo para pintura",
-     "un"),
+    (
+        "Acabamento",
+        "Rolo de pintura",
+        "Rolo para pintura",
+        "un"
+    ),
 
-    ("Acabamento",
-     "Trincha",
-     "Trincha para pintura",
-     "un"),
+    (
+        "Acabamento",
+        "Trincha",
+        "Trincha para pintura",
+        "un"
+    ),
 
-    ("Acabamento",
-     "Espátula de aço",
-     "Espátula para massa e acabamento",
-     "un"),
+    (
+        "Acabamento",
+        "Espátula de aço",
+        "Espátula para massa e acabamento",
+        "un"
+    ),
 
-    ("Acabamento",
-     "Raspador",
-     "Raspador para preparação de superfície",
-     "un"),
+    (
+        "Acabamento",
+        "Raspador",
+        "Raspador para preparação de superfície",
+        "un"
+    ),
 ]
 
 
 def popular_ferramentas_iniciais():
 
-    if Ferramenta.query.count() > 0:
-        return
+    try:
 
-    for categoria, nome, descricao, unidade in (
-        FERRAMENTAS_INICIAIS
-    ):
+        if Ferramenta.query.count() > 0:
+            return
 
-        db.session.add(
-            Ferramenta(
-                categoria=categoria,
-                nome=nome,
-                descricao=descricao,
-                unidade=unidade,
-                estoque_minimo=0,
-                estoque_atual=0,
-                ativo=True,
+        for categoria, nome, descricao, unidade in (
+            FERRAMENTAS_INICIAIS
+        ):
+
+            db.session.add(
+                Ferramenta(
+                    categoria=categoria,
+                    nome=nome,
+                    descricao=descricao,
+                    unidade=unidade,
+                    estoque_minimo=0,
+                    estoque_atual=0,
+                    ativo=True,
+                )
             )
+
+        db.session.commit()
+
+        logging.info(
+            "Catálogo inicial de ferramentas criado."
         )
 
-    db.session.commit()
+    except Exception:
 
-    logging.info(
-        "Catálogo inicial de ferramentas criado."
-    )
+        db.session.rollback()
+
+        logging.exception(
+            "Erro ao criar catálogo inicial de ferramentas."
+        )
 
 
 # ============================================================
@@ -3875,13 +4612,32 @@ def inicializar_banco():
 
     with app.app_context():
 
-        # Cria tabelas novas sem apagar as antigas.
+        logging.info(
+            "Iniciando banco de dados..."
+        )
+
+        # ----------------------------------------------------
+        # 1. Cria tabelas que ainda não existem.
+        # ----------------------------------------------------
+
         db.create_all()
 
-        # Migra somente as novas colunas.
+        # ----------------------------------------------------
+        # 2. IMPORTANTE:
+        # Faz a migração ANTES de qualquer consulta.
+        #
+        # Isso corrige o erro:
+        #
+        # column empresas.criado_em does not exist
+        # ----------------------------------------------------
+
         migrar_banco()
 
-        # Catálogo de ferramentas.
+        # ----------------------------------------------------
+        # 3. Agora que as colunas estão atualizadas,
+        # podemos consultar o banco com segurança.
+        # ----------------------------------------------------
+
         popular_ferramentas_iniciais()
 
         # ----------------------------------------------------
@@ -3897,7 +4653,18 @@ def inicializar_banco():
             )
 
             db.session.add(empresa)
-            db.session.commit()
+
+            try:
+
+                db.session.commit()
+
+            except Exception:
+
+                db.session.rollback()
+
+                logging.exception(
+                    "Erro ao criar empresa padrão."
+                )
 
         # ----------------------------------------------------
         # ADM GERAL
@@ -3936,11 +4703,26 @@ def inicializar_banco():
             )
 
             db.session.add(admin)
-            db.session.commit()
 
-            logging.info(
-                "ADM geral criado."
-            )
+            try:
+
+                db.session.commit()
+
+                logging.info(
+                    "ADM geral criado."
+                )
+
+            except Exception:
+
+                db.session.rollback()
+
+                logging.exception(
+                    "Erro ao criar ADM geral."
+                )
+
+        logging.info(
+            "Banco de dados inicializado com sucesso."
+        )
 
 
 # ============================================================
