@@ -1,173 +1,336 @@
 {% extends "base.html" %}
 
-{% block title %}
-Novo administrador - Construtora Pro
-{% endblock %}
+{% block title %}Novo administrador | Construtora Pro{% endblock %}
 
 {% block content %}
 
 <div class="container-fluid py-4">
 
+    <!-- Cabeçalho -->
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
 
         <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <a href="{{ url_for('admin_empresa_detalhes', empresa_id=empresa.id) }}"
+                   class="btn btn-light border">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
 
-            <div class="text-muted small mb-1">
-                <i class="bi bi-person-badge"></i>
-                Administração
+                <span class="text-muted small">
+                    Empresas / {{ empresa.nome_fantasia or empresa.razao_social }}
+                </span>
             </div>
 
-            <h2 class="fw-bold mb-1">
+            <h1 class="h3 fw-bold mb-1">
                 Novo administrador
-            </h2>
+            </h1>
 
             <p class="text-muted mb-0">
-                {{ empresa.nome_fantasia or empresa.razao_social }}
+                Cadastre o responsável pelo gerenciamento desta empresa.
             </p>
-
         </div>
 
-        <a
-            href="{{ url_for('admin_empresa_detalhes', empresa_id=empresa.id) }}"
-            class="btn btn-outline-secondary"
-        >
-            <i class="bi bi-arrow-left"></i>
-            Voltar
-        </a>
+        <div>
+            {% if empresa.ativo %}
+                <span class="badge bg-success-subtle text-success px-3 py-2">
+                    <i class="bi bi-check-circle me-1"></i>
+                    Empresa ativa
+                </span>
+            {% else %}
+                <span class="badge bg-danger-subtle text-danger px-3 py-2">
+                    <i class="bi bi-x-circle me-1"></i>
+                    Empresa inativa
+                </span>
+            {% endif %}
+        </div>
 
     </div>
 
 
-    <div class="row justify-content-center">
+    {% if not empresa.ativo %}
 
-        <div class="col-xl-7 col-lg-9">
+    <!-- Empresa inativa -->
+    <div class="alert alert-danger border-0 shadow-sm">
+        <div class="d-flex align-items-start gap-3">
+            <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+
+            <div>
+                <strong>Empresa inativa</strong>
+
+                <div class="small mt-1">
+                    Não é possível cadastrar um novo administrador enquanto esta empresa
+                    estiver desativada.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+
+    <div class="row g-4">
+
+        <!-- Formulário -->
+        <div class="col-xl-8">
 
             <div class="card border-0 shadow-sm">
 
-                <div class="card-body p-4 p-lg-5">
+                <div class="card-header bg-white border-0 pt-4 px-4">
 
-                    <div class="alert alert-info border-0">
+                    <div class="d-flex align-items-center gap-3">
 
-                        <div class="d-flex gap-3">
+                        <div class="rounded-3 bg-primary-subtle text-primary p-3">
+                            <i class="bi bi-person-plus-fill fs-4"></i>
+                        </div>
 
-                            <i class="bi bi-info-circle fs-4"></i>
+                        <div>
+                            <h5 class="fw-bold mb-1">
+                                Dados do administrador
+                            </h5>
 
-                            <div>
+                            <p class="text-muted small mb-0">
+                                Preencha os dados de acesso do responsável.
+                            </p>
+                        </div>
 
-                                <strong>Administrador da empresa</strong>
+                    </div>
 
-                                <div class="small mt-1">
-                                    Esse usuário ficará vinculado exclusivamente à empresa
-                                    <strong>
-                                        {{ empresa.nome_fantasia or empresa.razao_social }}
-                                    </strong>
-                                    e poderá administrar a operação dela.
+                </div>
+
+
+                <div class="card-body p-4">
+
+                    <form method="POST"
+                          action="{{ url_for('admin_novo_usuario_empresa', empresa_id=empresa.id) }}"
+                          id="adminForm"
+                          novalidate>
+
+                        <!-- Nome -->
+                        <div class="mb-4">
+
+                            <label for="nome" class="form-label fw-semibold">
+                                Nome completo
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <div class="input-group">
+
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-person"></i>
+                                </span>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="nome"
+                                    name="nome"
+                                    placeholder="Ex.: João da Silva"
+                                    minlength="3"
+                                    maxlength="120"
+                                    required
+                                    autocomplete="name"
+                                >
+
+                            </div>
+
+                            <div class="form-text">
+                                Nome que será exibido dentro do sistema.
+                            </div>
+
+                        </div>
+
+
+                        <!-- Usuário -->
+                        <div class="mb-4">
+
+                            <label for="usuario" class="form-label fw-semibold">
+                                Usuário de acesso
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <div class="input-group">
+
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-at"></i>
+                                </span>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="usuario"
+                                    name="usuario"
+                                    placeholder="Ex.: joao.silva"
+                                    minlength="3"
+                                    maxlength="80"
+                                    required
+                                    autocomplete="username"
+                                >
+
+                            </div>
+
+                            <div class="form-text">
+                                Será utilizado para entrar no sistema.
+                            </div>
+
+                        </div>
+
+
+                        <!-- Senha -->
+                        <div class="mb-4">
+
+                            <label for="senha" class="form-label fw-semibold">
+                                Senha
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <div class="input-group">
+
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-lock"></i>
+                                </span>
+
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    id="senha"
+                                    name="senha"
+                                    placeholder="Digite uma senha segura"
+                                    minlength="6"
+                                    maxlength="128"
+                                    required
+                                    autocomplete="new-password"
+                                >
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary"
+                                    id="toggleSenha"
+                                    tabindex="-1">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+
+                            </div>
+
+                            <!-- Força da senha -->
+                            <div class="mt-2">
+
+                                <div class="progress" style="height: 5px;">
+                                    <div
+                                        id="senhaForca"
+                                        class="progress-bar"
+                                        role="progressbar"
+                                        style="width: 0%;">
+                                    </div>
+                                </div>
+
+                                <small id="senhaMensagem"
+                                       class="text-muted">
+                                    Mínimo de 6 caracteres.
+                                </small>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- Confirmar senha -->
+                        <div class="mb-4">
+
+                            <label for="confirmacao" class="form-label fw-semibold">
+                                Confirmar senha
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <div class="input-group">
+
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-shield-lock"></i>
+                                </span>
+
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    id="confirmacao"
+                                    name="confirmacao"
+                                    placeholder="Digite a senha novamente"
+                                    minlength="6"
+                                    maxlength="128"
+                                    required
+                                    autocomplete="new-password"
+                                >
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary"
+                                    id="toggleConfirmacao"
+                                    tabindex="-1">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+
+                            </div>
+
+                            <small id="confirmacaoMensagem"
+                                   class="text-muted">
+                            </small>
+
+                        </div>
+
+
+                        <!-- Perfil -->
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+                                Perfil de acesso
+                            </label>
+
+                            <div class="border rounded-3 p-3 bg-light">
+
+                                <div class="d-flex align-items-start gap-3">
+
+                                    <div class="text-primary">
+                                        <i class="bi bi-shield-check fs-4"></i>
+                                    </div>
+
+                                    <div>
+
+                                        <div class="fw-semibold">
+                                            Administrador da empresa
+                                        </div>
+
+                                        <div class="small text-muted mt-1">
+                                            Terá acesso às funções administrativas da
+                                            empresa, como usuários, obras, materiais,
+                                            solicitações e demais recursos permitidos.
+                                        </div>
+
+                                    </div>
+
                                 </div>
 
                             </div>
 
                         </div>
 
-                    </div>
 
-
-                    <form method="POST">
-
-                        <div class="mb-4">
-
-                            <label class="form-label fw-semibold">
-                                Nome completo
-                            </label>
-
-                            <input
-                                type="text"
-                                name="nome"
-                                class="form-control form-control-lg"
-                                placeholder="Nome do administrador"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="mb-4">
-
-                            <label class="form-label fw-semibold">
-                                Nome de usuário
-                            </label>
-
-                            <input
-                                type="text"
-                                name="usuario"
-                                class="form-control form-control-lg"
-                                placeholder="ex: joao.silva"
-                                minlength="3"
-                                required
-                            >
-
-                            <div class="form-text">
-                                Esse será o usuário utilizado no login.
-                            </div>
-
-                        </div>
-
-
-                        <div class="mb-4">
-
-                            <label class="form-label fw-semibold">
-                                Senha
-                            </label>
-
-                            <input
-                                type="password"
-                                name="senha"
-                                class="form-control form-control-lg"
-                                minlength="6"
-                                required
-                            >
-
-                            <div class="form-text">
-                                Mínimo de 6 caracteres.
-                            </div>
-
-                        </div>
-
-
-                        <div class="mb-4">
-
-                            <label class="form-label fw-semibold">
-                                Confirmar senha
-                            </label>
-
-                            <input
-                                type="password"
-                                name="confirmar_senha"
-                                class="form-control form-control-lg"
-                                minlength="6"
-                                required
-                            >
-
-                        </div>
-
-
-                        <hr class="my-4">
-
-
-                        <div class="d-flex flex-wrap justify-content-end gap-2">
+                        <!-- Botões -->
+                        <div class="d-flex flex-wrap justify-content-end gap-2 pt-3 border-top">
 
                             <a
                                 href="{{ url_for('admin_empresa_detalhes', empresa_id=empresa.id) }}"
-                                class="btn btn-outline-secondary px-4"
-                            >
+                                class="btn btn-light border px-4">
+
+                                <i class="bi bi-x-lg me-1"></i>
                                 Cancelar
+
                             </a>
 
                             <button
                                 type="submit"
                                 class="btn btn-primary px-4"
-                            >
-                                <i class="bi bi-person-check"></i>
-                                Criar administrador
+                                id="btnSalvar">
+
+                                <i class="bi bi-person-plus-fill me-1"></i>
+                                Cadastrar administrador
+
                             </button>
 
                         </div>
@@ -180,8 +343,335 @@ Novo administrador - Construtora Pro
 
         </div>
 
+
+        <!-- Informações laterais -->
+        <div class="col-xl-4">
+
+            <div class="card border-0 shadow-sm mb-4">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex align-items-center gap-3 mb-3">
+
+                        <div class="rounded-3 bg-success-subtle text-success p-3">
+                            <i class="bi bi-building fs-4"></i>
+                        </div>
+
+                        <div>
+                            <h6 class="fw-bold mb-1">
+                                Empresa
+                            </h6>
+
+                            <div class="small text-muted">
+                                Conta vinculada
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <h5 class="fw-bold mb-1">
+                        {{ empresa.nome_fantasia or empresa.razao_social }}
+                    </h5>
+
+                    {% if empresa.razao_social and empresa.nome_fantasia %}
+                        <div class="small text-muted mb-3">
+                            {{ empresa.razao_social }}
+                        </div>
+                    {% endif %}
+
+                    <div class="border-top pt-3">
+
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">
+                                Status
+                            </span>
+
+                            <strong class="text-success">
+                                Ativa
+                            </strong>
+                        </div>
+
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">
+                                Administradores
+                            </span>
+
+                            <strong>
+                                {{ empresa.usuarios|selectattr('funcao', 'equalto', 'administrador_empresa')|list|length }}
+                            </strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- Segurança -->
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex align-items-center gap-2 mb-3">
+
+                        <i class="bi bi-shield-lock text-primary fs-5"></i>
+
+                        <h6 class="fw-bold mb-0">
+                            Segurança
+                        </h6>
+
+                    </div>
+
+                    <ul class="list-unstyled small text-muted mb-0">
+
+                        <li class="d-flex gap-2 mb-3">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span>
+                                A senha será armazenada de forma protegida.
+                            </span>
+                        </li>
+
+                        <li class="d-flex gap-2 mb-3">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span>
+                                O administrador ficará vinculado somente a esta empresa.
+                            </span>
+                        </li>
+
+                        <li class="d-flex gap-2">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span>
+                                O administrador global do sistema permanece separado.
+                            </span>
+                        </li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
     </div>
 
+    {% endif %}
+
 </div>
+
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const senha = document.getElementById("senha");
+    const confirmacao = document.getElementById("confirmacao");
+
+    const toggleSenha = document.getElementById("toggleSenha");
+    const toggleConfirmacao = document.getElementById("toggleConfirmacao");
+
+    const senhaForca = document.getElementById("senhaForca");
+    const senhaMensagem = document.getElementById("senhaMensagem");
+
+    const confirmacaoMensagem =
+        document.getElementById("confirmacaoMensagem");
+
+    const form = document.getElementById("adminForm");
+
+    if (!form) {
+        return;
+    }
+
+
+    /* Mostrar / esconder senha */
+    function alternarSenha(input, botao) {
+
+        if (!input || !botao) {
+            return;
+        }
+
+        const icon = botao.querySelector("i");
+
+        if (input.type === "password") {
+
+            input.type = "text";
+
+            icon.classList.remove("bi-eye");
+            icon.classList.add("bi-eye-slash");
+
+        } else {
+
+            input.type = "password";
+
+            icon.classList.remove("bi-eye-slash");
+            icon.classList.add("bi-eye");
+
+        }
+
+    }
+
+
+    toggleSenha.addEventListener("click", function () {
+        alternarSenha(senha, toggleSenha);
+    });
+
+
+    toggleConfirmacao.addEventListener("click", function () {
+        alternarSenha(confirmacao, toggleConfirmacao);
+    });
+
+
+    /* Indicador de força da senha */
+    senha.addEventListener("input", function () {
+
+        const valor = senha.value;
+        let pontos = 0;
+
+        if (valor.length >= 6) {
+            pontos++;
+        }
+
+        if (valor.length >= 10) {
+            pontos++;
+        }
+
+        if (/[A-Z]/.test(valor)) {
+            pontos++;
+        }
+
+        if (/[0-9]/.test(valor)) {
+            pontos++;
+        }
+
+        if (/[^A-Za-z0-9]/.test(valor)) {
+            pontos++;
+        }
+
+
+        if (valor.length === 0) {
+
+            senhaForca.style.width = "0%";
+            senhaMensagem.textContent = "Mínimo de 6 caracteres.";
+
+        } else if (pontos <= 1) {
+
+            senhaForca.style.width = "25%";
+            senhaMensagem.textContent = "Senha fraca.";
+
+        } else if (pontos <= 3) {
+
+            senhaForca.style.width = "60%";
+            senhaMensagem.textContent = "Senha razoável.";
+
+        } else {
+
+            senhaForca.style.width = "100%";
+            senhaMensagem.textContent = "Senha forte.";
+
+        }
+
+    });
+
+
+    /* Confirmação da senha */
+    confirmacao.addEventListener("input", verificarSenhas);
+
+    senha.addEventListener("input", verificarSenhas);
+
+
+    function verificarSenhas() {
+
+        if (!confirmacao.value) {
+
+            confirmacaoMensagem.textContent = "";
+            confirmacao.className = "form-control";
+
+            return;
+        }
+
+
+        if (senha.value === confirmacao.value) {
+
+            confirmacao.classList.remove("is-invalid");
+            confirmacao.classList.add("is-valid");
+
+            confirmacaoMensagem.textContent = "As senhas conferem.";
+            confirmacaoMensagem.className = "text-success small";
+
+        } else {
+
+            confirmacao.classList.remove("is-valid");
+            confirmacao.classList.add("is-invalid");
+
+            confirmacaoMensagem.textContent = "As senhas não conferem.";
+            confirmacaoMensagem.className = "text-danger small";
+
+        }
+
+    }
+
+
+    /* Validação final */
+    form.addEventListener("submit", function (event) {
+
+        const nome = document.getElementById("nome").value.trim();
+        const usuario = document.getElementById("usuario").value.trim();
+        const senhaValor = senha.value;
+        const confirmacaoValor = confirmacao.value;
+
+
+        if (nome.length < 3) {
+
+            event.preventDefault();
+
+            alert("Informe o nome completo do administrador.");
+
+            document.getElementById("nome").focus();
+
+            return;
+        }
+
+
+        if (usuario.length < 3) {
+
+            event.preventDefault();
+
+            alert("O usuário deve possuir pelo menos 3 caracteres.");
+
+            document.getElementById("usuario").focus();
+
+            return;
+        }
+
+
+        if (senhaValor.length < 6) {
+
+            event.preventDefault();
+
+            alert("A senha deve possuir pelo menos 6 caracteres.");
+
+            senha.focus();
+
+            return;
+        }
+
+
+        if (senhaValor !== confirmacaoValor) {
+
+            event.preventDefault();
+
+            alert("As senhas não conferem.");
+
+            confirmacao.focus();
+
+            return;
+        }
+
+    });
+
+});
+
+</script>
 
 {% endblock %}
