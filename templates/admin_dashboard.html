@@ -1,96 +1,225 @@
 {% extends "base.html" %}
 
-{% block title %}Painel Administrativo{% endblock %}
+{% block title %}
+    Painel Geral — Construtora Pro
+{% endblock %}
 
 {% block content %}
 
-<div class="container-fluid py-3">
+<div class="container-fluid">
 
-    <!-- CABEÇALHO -->
-    <div class="card border-0 shadow-sm mb-4"
-         style="background: linear-gradient(135deg, #123b5d, #176b9c); color: white; border-radius: 16px;">
+    <!-- =====================================================
+         CABEÇALHO
+    ====================================================== -->
 
-        <div class="card-body p-4">
+    <div class="d-flex flex-column flex-md-row
+                justify-content-between
+                align-items-md-center
+                gap-3 mb-4">
 
-            <div class="d-flex flex-column flex-md-row
-                        justify-content-between align-items-md-center gap-3">
+        <div>
 
-                <div>
-                    <div class="small text-uppercase opacity-75 mb-1">
-                        Painel do Sistema
-                    </div>
+            <h1 class="fw-bold mb-1">
 
-                    <h1 class="h3 mb-2">
-                        Olá, Administrador Geral
-                    </h1>
+                <i class="bi bi-speedometer2"></i>
 
-                    <p class="mb-0 opacity-75">
-                        Gerencie e monitore as empreiteiras cadastradas no Construtora Pro.
-                    </p>
-                </div>
+                Painel Geral
 
-                <div>
-                    <a href="{{ url_for('nova_empresa') }}"
-                       class="btn btn-light fw-semibold">
-                        <i class="bi bi-plus-circle me-1"></i>
-                        Cadastrar empreiteira
-                    </a>
-                </div>
+            </h1>
 
-            </div>
+            <p class="text-muted mb-0">
+
+                Administração central das empreiteiras cadastradas.
+
+            </p>
 
         </div>
+
+
+        <div>
+
+            <a
+                href="{{ url_for('nova_empresa') }}"
+                class="btn btn-primary"
+            >
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nova empreiteira
+
+            </a>
+
+        </div>
+
     </div>
 
 
-    <!-- RESUMO DO SISTEMA -->
+    <!-- =====================================================
+         INDICADORES DO SISTEMA
+    ====================================================== -->
+
     <div class="row g-3 mb-4">
 
-        <div class="col-12 col-md-6">
 
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body d-flex align-items-center gap-3">
+        <!-- EMPRESAS -->
 
-                    <div class="rounded-3 p-3 bg-primary-subtle text-primary">
-                        <i class="bi bi-buildings fs-4"></i>
-                    </div>
+        <div class="col-12 col-sm-6 col-xl-3">
 
-                    <div>
-                        <div class="text-muted small">
-                            Empreiteiras cadastradas
+            <div class="card h-100 shadow-sm border-0">
+
+                <div class="card-body">
+
+                    <div class="d-flex
+                                justify-content-between
+                                align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                Empreiteiras
+                            </small>
+
+                            <h2 class="fw-bold mb-0">
+
+                                {{ total_empresas }}
+
+                            </h2>
+
                         </div>
 
-                        <div class="fs-3 fw-bold">
-                            {{ total_empresas }}
+                        <div class="fs-1 text-primary">
+
+                            <i class="bi bi-buildings"></i>
+
                         </div>
+
                     </div>
 
                 </div>
+
             </div>
 
         </div>
 
 
-        <div class="col-12 col-md-6">
+        <!-- ATIVAS -->
 
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body d-flex align-items-center gap-3">
+        <div class="col-12 col-sm-6 col-xl-3">
 
-                    <div class="rounded-3 p-3 bg-success-subtle text-success">
-                        <i class="bi bi-check-circle fs-4"></i>
-                    </div>
+            <div class="card h-100 shadow-sm border-0">
 
-                    <div>
-                        <div class="text-muted small">
-                            Empreiteiras ativas
+                <div class="card-body">
+
+                    <div class="d-flex
+                                justify-content-between
+                                align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                Empreiteiras ativas
+                            </small>
+
+                            <h2 class="fw-bold mb-0">
+
+                                {{ empresas_ativas }}
+
+                            </h2>
+
                         </div>
 
-                        <div class="fs-3 fw-bold">
-                            {{ empresas_ativas }}
+                        <div class="fs-1 text-success">
+
+                            <i class="bi bi-building-check"></i>
+
                         </div>
+
                     </div>
 
                 </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- OBRAS -->
+
+        <div class="col-12 col-sm-6 col-xl-3">
+
+            <div class="card h-100 shadow-sm border-0">
+
+                <div class="card-body">
+
+                    <div class="d-flex
+                                justify-content-between
+                                align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                Obras cadastradas
+                            </small>
+
+                            <h2 class="fw-bold mb-0">
+
+                                {{ total_obras }}
+
+                            </h2>
+
+                        </div>
+
+                        <div class="fs-1 text-info">
+
+                            <i class="bi bi-houses"></i>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- SOLICITAÇÕES -->
+
+        <div class="col-12 col-sm-6 col-xl-3">
+
+            <div class="card h-100 shadow-sm border-0">
+
+                <div class="card-body">
+
+                    <div class="d-flex
+                                justify-content-between
+                                align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                Solicitações pendentes
+                            </small>
+
+                            <h2 class="fw-bold mb-0">
+
+                                {{ solicitacoes_pendentes }}
+
+                            </h2>
+
+                        </div>
+
+                        <div class="fs-1 text-warning">
+
+                            <i class="bi bi-clipboard-check"></i>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
             </div>
 
         </div>
@@ -98,28 +227,50 @@
     </div>
 
 
-    <!-- EMPREITEIRAS -->
-    <div class="card border-0 shadow-sm">
+    <!-- =====================================================
+         EMPREITEIRAS
+    ====================================================== -->
 
-        <div class="card-header bg-white border-0 p-4">
+    <div class="card shadow-sm border-0">
 
-            <div class="d-flex flex-column flex-md-row
-                        justify-content-between align-items-md-center gap-2">
+        <div class="card-header bg-white py-3">
+
+            <div class="d-flex
+                        flex-column flex-md-row
+                        justify-content-between
+                        align-items-md-center
+                        gap-2">
 
                 <div>
-                    <h2 class="h5 mb-1">
-                        <i class="bi bi-buildings me-2"></i>
-                        Empreiteiras cadastradas
-                    </h2>
 
-                    <p class="text-muted small mb-0">
-                        Acompanhe as empresas cadastradas no sistema.
-                    </p>
+                    <h5 class="mb-1 fw-bold">
+
+                        <i class="bi bi-buildings"></i>
+
+                        Empreiteiras cadastradas
+
+                    </h5>
+
+                    <small class="text-muted">
+
+                        Gerencie e monitore as empresas
+                        vinculadas ao sistema.
+
+                    </small>
+
                 </div>
 
-                <span class="badge text-bg-light border">
-                    {{ total_empresas }} empresa(s)
-                </span>
+
+                <a
+                    href="{{ url_for('admin_empresas') }}"
+                    class="btn btn-outline-primary btn-sm"
+                >
+
+                    Ver todas
+
+                    <i class="bi bi-arrow-right"></i>
+
+                </a>
 
             </div>
 
@@ -130,143 +281,216 @@
 
             {% if empresas %}
 
-                <div class="table-responsive">
+            <div class="table-responsive">
 
-                    <table class="table table-hover align-middle mb-0">
+                <table class="table
+                              table-hover
+                              align-middle
+                              mb-0">
 
-                        <thead class="table-light">
+                    <thead class="table-light">
 
-                            <tr>
+                        <tr>
 
-                                <th class="px-4">
-                                    Empreiteira
-                                </th>
+                            <th>
+                                Empreiteira
+                            </th>
 
-                                <th>
-                                    CNPJ
-                                </th>
+                            <th>
+                                CNPJ
+                            </th>
 
-                                <th>
-                                    Status
-                                </th>
+                            <th class="text-center">
+                                Status
+                            </th>
 
-                                <th class="text-end px-4">
-                                    Ação
-                                </th>
+                            <th class="text-center">
+                                Ações
+                            </th>
 
-                            </tr>
+                        </tr>
 
-                        </thead>
-
-
-                        <tbody>
-
-                            {% for empresa in empresas %}
-
-                            <tr>
-
-                                <td class="px-4">
-
-                                    <div class="fw-semibold">
-                                        {{ empresa.nome_fantasia }}
-                                    </div>
-
-                                    {% if empresa.razao_social %}
-                                        <div class="small text-muted">
-                                            {{ empresa.razao_social }}
-                                        </div>
-                                    {% endif %}
-
-                                </td>
+                    </thead>
 
 
-                                <td>
+                    <tbody>
 
-                                    {% if empresa.cnpj %}
-                                        {{ empresa.cnpj }}
-                                    {% else %}
-                                        <span class="text-muted">
-                                            Não informado
+                    {% for empresa in empresas %}
+
+                        <tr>
+
+
+                            <!-- EMPRESA -->
+
+                            <td>
+
+                                <div class="fw-semibold">
+
+                                    {{ empresa.nome_fantasia }}
+
+                                </div>
+
+                                {% if empresa.razao_social
+                                      and empresa.razao_social
+                                      != empresa.nome_fantasia %}
+
+                                <small class="text-muted">
+
+                                    {{ empresa.razao_social }}
+
+                                </small>
+
+                                {% endif %}
+
+                            </td>
+
+
+                            <!-- CNPJ -->
+
+                            <td>
+
+                                {{ empresa.cnpj or "Não informado" }}
+
+                            </td>
+
+
+                            <!-- STATUS -->
+
+                            <td class="text-center">
+
+                                {% if empresa.ativo %}
+
+                                    <span class="badge text-bg-success">
+
+                                        <i class="bi bi-check-circle"></i>
+
+                                        Ativa
+
+                                    </span>
+
+                                {% else %}
+
+                                    <span class="badge text-bg-secondary">
+
+                                        <i class="bi bi-slash-circle"></i>
+
+                                        Bloqueada
+
+                                    </span>
+
+                                {% endif %}
+
+                            </td>
+
+
+                            <!-- AÇÕES -->
+
+                            <td>
+
+                                <div class="d-flex
+                                            justify-content-center
+                                            gap-1
+                                            flex-wrap">
+
+
+                                    <!-- MONITORAR -->
+
+                                    <a
+                                        href="{{ url_for(
+                                            'monitorar_empresa',
+                                            empresa_id=empresa.id
+                                        ) }}"
+                                        class="btn btn-sm btn-outline-primary"
+                                        title="Monitorar empresa"
+                                    >
+
+                                        <i class="bi bi-eye"></i>
+
+                                        <span class="d-none d-md-inline">
+                                            Monitorar
                                         </span>
-                                    {% endif %}
-
-                                </td>
-
-
-                                <td>
-
-                                    {% if empresa.ativo %}
-
-                                        <span class="badge rounded-pill text-bg-success">
-                                            <i class="bi bi-check-circle me-1"></i>
-                                            Ativa
-                                        </span>
-
-                                    {% else %}
-
-                                        <span class="badge rounded-pill text-bg-secondary">
-                                            <i class="bi bi-pause-circle me-1"></i>
-                                            Inativa
-                                        </span>
-
-                                    {% endif %}
-
-                                </td>
-
-
-                                <td class="text-end px-4">
-
-                                    <a href="{{ url_for(
-                                        'monitorar_empresa',
-                                        empresa_id=empresa.id
-                                    ) }}"
-                                       class="btn btn-sm btn-primary">
-
-                                        <i class="bi bi-eye me-1"></i>
-                                        Monitorar
 
                                     </a>
 
-                                </td>
 
-                            </tr>
+                                    <!-- DETALHES -->
 
-                            {% endfor %}
+                                    <a
+                                        href="{{ url_for(
+                                            'empresa_detalhes',
+                                            empresa_id=empresa.id
+                                        ) }}"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        title="Ver empresa"
+                                    >
 
-                        </tbody>
+                                        <i class="bi bi-building"></i>
 
-                    </table>
+                                    </a>
 
-                </div>
+
+                                    <!-- EDITAR -->
+
+                                    <a
+                                        href="{{ url_for(
+                                            'editar_empresa',
+                                            empresa_id=empresa.id
+                                        ) }}"
+                                        class="btn btn-sm btn-outline-warning"
+                                        title="Editar empresa"
+                                    >
+
+                                        <i class="bi bi-pencil"></i>
+
+                                    </a>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
 
             {% else %}
 
-                <div class="text-center py-5 px-3">
+            <div class="text-center py-5">
 
-                    <div class="mb-3">
+                <div class="fs-1 text-muted mb-3">
 
-                        <i class="bi bi-buildings"
-                           style="font-size: 3rem; opacity: .35;"></i>
-
-                    </div>
-
-                    <h5>
-                        Nenhuma empreiteira cadastrada
-                    </h5>
-
-                    <p class="text-muted mb-4">
-                        Cadastre a primeira empreiteira para começar.
-                    </p>
-
-                    <a href="{{ url_for('nova_empresa') }}"
-                       class="btn btn-primary">
-
-                        <i class="bi bi-plus-circle me-1"></i>
-                        Cadastrar empreiteira
-
-                    </a>
+                    <i class="bi bi-buildings"></i>
 
                 </div>
+
+                <h5>
+                    Nenhuma empreiteira cadastrada
+                </h5>
+
+                <p class="text-muted">
+
+                    Cadastre a primeira empreiteira
+                    para começar.
+
+                </p>
+
+                <a
+                    href="{{ url_for('nova_empresa') }}"
+                    class="btn btn-primary"
+                >
+
+                    <i class="bi bi-plus-lg"></i>
+
+                    Cadastrar empreiteira
+
+                </a>
+
+            </div>
 
             {% endif %}
 
@@ -275,24 +499,36 @@
     </div>
 
 
-    <!-- AVISO DE SEPARAÇÃO -->
-    <div class="alert alert-info border-0 shadow-sm mt-4">
+    <!-- =====================================================
+         INFORMAÇÃO SOBRE O PERFIL
+    ====================================================== -->
 
-        <div class="d-flex gap-2">
+    <div class="alert alert-light border mt-4">
 
-            <i class="bi bi-info-circle fs-5"></i>
+        <div class="d-flex gap-3">
+
+            <div class="fs-4">
+
+                <i class="bi bi-shield-lock"></i>
+
+            </div>
 
             <div>
 
-                <strong>Painel do Administrador Geral</strong>
+                <strong>
+                    Acesso de Administrador Geral
+                </strong>
 
-                <div class="small mt-1">
-                    Este painel é destinado exclusivamente ao gerenciamento
-                    e monitoramento das empreiteiras cadastradas.
-                    As operações de obras, funcionários, materiais,
-                    ferramentas, estoque, solicitações e compras ficam
-                    dentro do painel individual de cada empreiteira.
-                </div>
+                <p class="mb-0 text-muted">
+
+                    Este painel é destinado exclusivamente
+                    ao gerenciamento das empreiteiras cadastradas.
+                    As operações internas de cada empresa,
+                    como funcionários, estoque, materiais,
+                    ferramentas e solicitações, são realizadas
+                    pelo Administrador da própria empreiteira.
+
+                </p>
 
             </div>
 
