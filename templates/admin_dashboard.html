@@ -1,328 +1,96 @@
 {% extends "base.html" %}
 
-{% block title %}Painel ADM | Construtora Pro{% endblock %}
+{% block title %}Painel Administrativo{% endblock %}
 
 {% block content %}
 
-<div class="container-fluid py-4">
+<div class="container-fluid py-3">
 
-    <!-- =========================================================
-         CABEÇALHO
-    ========================================================== -->
+    <!-- CABEÇALHO -->
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: linear-gradient(135deg, #123b5d, #176b9c); color: white; border-radius: 16px;">
 
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div class="card-body p-4">
 
-        <div>
+            <div class="d-flex flex-column flex-md-row
+                        justify-content-between align-items-md-center gap-3">
 
-            <span class="badge bg-danger-subtle text-danger px-3 py-2 mb-2">
-                <i class="bi bi-shield-lock me-1"></i>
-                Administração
-            </span>
+                <div>
+                    <div class="small text-uppercase opacity-75 mb-1">
+                        Painel do Sistema
+                    </div>
 
-            <h1 class="fw-bold mb-1">
-                Painel Administrativo
-            </h1>
+                    <h1 class="h3 mb-2">
+                        Olá, Administrador Geral
+                    </h1>
 
-            <p class="text-muted mb-0">
-                Controle geral da plataforma Construtora Pro.
-            </p>
+                    <p class="mb-0 opacity-75">
+                        Gerencie e monitore as empreiteiras cadastradas no Construtora Pro.
+                    </p>
+                </div>
 
-        </div>
+                <div>
+                    <a href="{{ url_for('nova_empresa') }}"
+                       class="btn btn-light fw-semibold">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Cadastrar empreiteira
+                    </a>
+                </div>
 
-
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-
-            <span class="badge bg-success-subtle text-success px-3 py-2">
-                <i class="bi bi-circle-fill me-1 small"></i>
-                Sistema operacional
-            </span>
-
-            <a
-                href="{{ url_for('admin_nova_empresa') }}"
-                class="btn btn-primary"
-            >
-                <i class="bi bi-plus-lg me-1"></i>
-                Nova empresa
-            </a>
+            </div>
 
         </div>
-
     </div>
 
 
-    <!-- =========================================================
-         INDICADORES PRINCIPAIS
-    ========================================================== -->
-
-    <div class="row g-4 mb-4">
-
-
-        <!-- EMPRESAS -->
-
-        <div class="col-12 col-md-6 col-xl-3">
-
-            <div class="card border-0 shadow-sm h-100">
-
-                <div class="card-body p-4">
-
-                    <div class="d-flex justify-content-between align-items-start">
-
-                        <div>
-
-                            <div class="text-muted small fw-semibold">
-                                EMPRESAS
-                            </div>
-
-                            <div class="display-6 fw-bold mt-2">
-                                {{ total_empresas }}
-                            </div>
-
-                        </div>
-
-                        <div class="bg-primary-subtle text-primary rounded-3 p-3">
-
-                            <i class="bi bi-buildings fs-4"></i>
-
-                        </div>
-
-                    </div>
-
-                    <div class="small text-muted mt-3">
-                        Empresas cadastradas
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- USUÁRIOS -->
-
-        <div class="col-12 col-md-6 col-xl-3">
-
-            <div class="card border-0 shadow-sm h-100">
-
-                <div class="card-body p-4">
-
-                    <div class="d-flex justify-content-between align-items-start">
-
-                        <div>
-
-                            <div class="text-muted small fw-semibold">
-                                USUÁRIOS
-                            </div>
-
-                            <div class="display-6 fw-bold mt-2">
-                                {{ total_usuarios }}
-                            </div>
-
-                        </div>
-
-                        <div class="bg-success-subtle text-success rounded-3 p-3">
-
-                            <i class="bi bi-people fs-4"></i>
-
-                        </div>
-
-                    </div>
-
-                    <div class="small text-muted mt-3">
-                        Usuários da plataforma
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- OBRAS -->
-
-        <div class="col-12 col-md-6 col-xl-3">
-
-            <div class="card border-0 shadow-sm h-100">
-
-                <div class="card-body p-4">
-
-                    <div class="d-flex justify-content-between align-items-start">
-
-                        <div>
-
-                            <div class="text-muted small fw-semibold">
-                                OBRAS
-                            </div>
-
-                            <div class="display-6 fw-bold mt-2">
-                                {{ total_obras }}
-                            </div>
-
-                        </div>
-
-                        <div class="bg-warning-subtle text-warning rounded-3 p-3">
-
-                            <i class="bi bi-building fs-4"></i>
-
-                        </div>
-
-                    </div>
-
-                    <div class="small text-muted mt-3">
-                        Obras cadastradas
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- SOLICITAÇÕES -->
-
-        <div class="col-12 col-md-6 col-xl-3">
-
-            <div class="card border-0 shadow-sm h-100">
-
-                <div class="card-body p-4">
-
-                    <div class="d-flex justify-content-between align-items-start">
-
-                        <div>
-
-                            <div class="text-muted small fw-semibold">
-                                SOLICITAÇÕES
-                            </div>
-
-                            <div class="display-6 fw-bold mt-2">
-                                {{ total_solicitacoes }}
-                            </div>
-
-                        </div>
-
-                        <div class="bg-info-subtle text-info rounded-3 p-3">
-
-                            <i class="bi bi-clipboard-check fs-4"></i>
-
-                        </div>
-
-                    </div>
-
-                    <div class="small text-muted mt-3">
-                        Solicitações de materiais
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- =========================================================
-         RESUMO DA PLATAFORMA
-    ========================================================== -->
-
-    <div class="row g-4 mb-4">
-
-
-        <!-- EMPRESAS ATIVAS -->
+    <!-- RESUMO DO SISTEMA -->
+    <div class="row g-3 mb-4">
 
         <div class="col-12 col-md-6">
 
             <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
 
-                <div class="card-body p-4">
+                    <div class="rounded-3 p-3 bg-primary-subtle text-primary">
+                        <i class="bi bi-buildings fs-4"></i>
+                    </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
-
-                        <div>
-
-                            <div class="text-muted small fw-semibold">
-                                EMPRESAS ATIVAS
-                            </div>
-
-                            <div class="fs-2 fw-bold mt-1">
-
-                                {{
-                                    empresas
-                                    | selectattr("ativo")
-                                    | list
-                                    | length
-                                }}
-
-                            </div>
-
-                            <div class="small text-muted">
-                                Empresas liberadas para utilização
-                            </div>
-
+                    <div>
+                        <div class="text-muted small">
+                            Empreiteiras cadastradas
                         </div>
 
-
-                        <div class="bg-success-subtle text-success rounded-circle p-3">
-
-                            <i class="bi bi-check-circle fs-4"></i>
-
+                        <div class="fs-3 fw-bold">
+                            {{ total_empresas }}
                         </div>
-
                     </div>
 
                 </div>
-
             </div>
 
         </div>
 
 
-        <!-- EMPRESAS INATIVAS -->
-
         <div class="col-12 col-md-6">
 
             <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
 
-                <div class="card-body p-4">
+                    <div class="rounded-3 p-3 bg-success-subtle text-success">
+                        <i class="bi bi-check-circle fs-4"></i>
+                    </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
-
-                        <div>
-
-                            <div class="text-muted small fw-semibold">
-                                EMPRESAS INATIVAS
-                            </div>
-
-                            <div class="fs-2 fw-bold mt-1">
-
-                                {{
-                                    empresas
-                                    | rejectattr("ativo")
-                                    | list
-                                    | length
-                                }}
-
-                            </div>
-
-                            <div class="small text-muted">
-                                Empresas temporariamente bloqueadas
-                            </div>
-
+                    <div>
+                        <div class="text-muted small">
+                            Empreiteiras ativas
                         </div>
 
-
-                        <div class="bg-danger-subtle text-danger rounded-circle p-3">
-
-                            <i class="bi bi-pause-circle fs-4"></i>
-
+                        <div class="fs-3 fw-bold">
+                            {{ empresas_ativas }}
                         </div>
-
                     </div>
 
                 </div>
-
             </div>
 
         </div>
@@ -330,569 +98,200 @@
     </div>
 
 
-    <!-- =========================================================
-         GERENCIAMENTO DE EMPRESAS
-    ========================================================== -->
-
+    <!-- EMPREITEIRAS -->
     <div class="card border-0 shadow-sm">
-
-        <!-- CABEÇALHO -->
 
         <div class="card-header bg-white border-0 p-4">
 
-            <div class="d-flex flex-column flex-xl-row justify-content-between gap-3">
+            <div class="d-flex flex-column flex-md-row
+                        justify-content-between align-items-md-center gap-2">
 
                 <div>
-
-                    <h5 class="fw-bold mb-1">
-
+                    <h2 class="h5 mb-1">
                         <i class="bi bi-buildings me-2"></i>
-
-                        Empresas cadastradas
-
-                    </h5>
+                        Empreiteiras cadastradas
+                    </h2>
 
                     <p class="text-muted small mb-0">
-
-                        Visualize e gerencie as empreiteiras da plataforma.
-
+                        Acompanhe as empresas cadastradas no sistema.
                     </p>
-
                 </div>
 
-
-                <div class="d-flex flex-column flex-md-row gap-2">
-
-                    <!-- BUSCA -->
-
-                    <div class="input-group">
-
-                        <span class="input-group-text bg-light border-end-0">
-
-                            <i class="bi bi-search"></i>
-
-                        </span>
-
-                        <input
-                            type="text"
-                            id="buscaEmpresa"
-                            class="form-control bg-light border-start-0"
-                            placeholder="Buscar empresa..."
-                            autocomplete="off"
-                        >
-
-                    </div>
-
-
-                    <!-- FILTRO -->
-
-                    <select
-                        id="filtroStatus"
-                        class="form-select"
-                        style="min-width: 160px;"
-                    >
-
-                        <option value="todas">
-                            Todos os status
-                        </option>
-
-                        <option value="ativa">
-                            Ativas
-                        </option>
-
-                        <option value="inativa">
-                            Inativas
-                        </option>
-
-                    </select>
-
-                </div>
+                <span class="badge text-bg-light border">
+                    {{ total_empresas }} empresa(s)
+                </span>
 
             </div>
 
         </div>
 
 
-        <!-- TABELA -->
+        <div class="card-body p-0">
 
-        <div class="table-responsive">
+            {% if empresas %}
 
-            <table class="table align-middle mb-0" id="tabelaEmpresas">
+                <div class="table-responsive">
 
-                <thead class="table-light">
+                    <table class="table table-hover align-middle mb-0">
 
-                    <tr>
+                        <thead class="table-light">
 
-                        <th class="px-4">
-                            Empresa
-                        </th>
+                            <tr>
 
-                        <th>
-                            CNPJ
-                        </th>
+                                <th class="px-4">
+                                    Empreiteira
+                                </th>
 
-                        <th>
-                            Telefone
-                        </th>
+                                <th>
+                                    CNPJ
+                                </th>
 
-                        <th>
-                            Status
-                        </th>
+                                <th>
+                                    Status
+                                </th>
 
-                        <th class="text-end px-4">
-                            Ações
-                        </th>
+                                <th class="text-end px-4">
+                                    Ação
+                                </th>
 
-                    </tr>
+                            </tr>
 
-                </thead>
+                        </thead>
 
 
-                <tbody id="listaEmpresas">
+                        <tbody>
 
-                    {% for empresa in empresas %}
+                            {% for empresa in empresas %}
 
-                    <tr
-                        class="linha-empresa"
-                        data-nome="{{ (empresa.nome_fantasia or empresa.razao_social or '') | lower }}"
-                        data-razao="{{ (empresa.razao_social or '') | lower }}"
-                        data-status="{% if empresa.ativo %}ativa{% else %}inativa{% endif %}"
-                    >
+                            <tr>
 
-
-                        <!-- EMPRESA -->
-
-                        <td class="px-4">
-
-                            <div class="d-flex align-items-center gap-3">
-
-                                <div
-                                    class="
-                                        rounded-3
-                                        d-flex
-                                        align-items-center
-                                        justify-content-center
-                                        bg-primary-subtle
-                                        text-primary
-                                    "
-                                    style="width: 44px; height: 44px;"
-                                >
-
-                                    <i class="bi bi-building fs-5"></i>
-
-                                </div>
-
-
-                                <div>
+                                <td class="px-4">
 
                                     <div class="fw-semibold">
-
-                                        {{ empresa.nome_fantasia or empresa.razao_social }}
-
+                                        {{ empresa.nome_fantasia }}
                                     </div>
-
 
                                     {% if empresa.razao_social %}
+                                        <div class="small text-muted">
+                                            {{ empresa.razao_social }}
+                                        </div>
+                                    {% endif %}
 
-                                    <div class="small text-muted">
+                                </td>
 
-                                        {{ empresa.razao_social }}
 
-                                    </div>
+                                <td>
+
+                                    {% if empresa.cnpj %}
+                                        {{ empresa.cnpj }}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            Não informado
+                                        </span>
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if empresa.ativo %}
+
+                                        <span class="badge rounded-pill text-bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            Ativa
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="badge rounded-pill text-bg-secondary">
+                                            <i class="bi bi-pause-circle me-1"></i>
+                                            Inativa
+                                        </span>
 
                                     {% endif %}
 
-                                </div>
+                                </td>
 
-                            </div>
 
-                        </td>
+                                <td class="text-end px-4">
 
+                                    <a href="{{ url_for(
+                                        'monitorar_empresa',
+                                        empresa_id=empresa.id
+                                    ) }}"
+                                       class="btn btn-sm btn-primary">
 
-                        <!-- CNPJ -->
+                                        <i class="bi bi-eye me-1"></i>
+                                        Monitorar
 
-                        <td>
+                                    </a>
 
-                            <span class="text-muted">
+                                </td>
 
-                                {{ empresa.cnpj or "—" }}
+                            </tr>
 
-                            </span>
+                            {% endfor %}
 
-                        </td>
+                        </tbody>
 
+                    </table>
 
-                        <!-- TELEFONE -->
+                </div>
 
-                        <td>
+            {% else %}
 
-                            <span class="text-muted">
+                <div class="text-center py-5 px-3">
 
-                                {{ empresa.telefone or "—" }}
+                    <div class="mb-3">
 
-                            </span>
+                        <i class="bi bi-buildings"
+                           style="font-size: 3rem; opacity: .35;"></i>
 
-                        </td>
+                    </div>
 
+                    <h5>
+                        Nenhuma empreiteira cadastrada
+                    </h5>
 
-                        <!-- STATUS -->
+                    <p class="text-muted mb-4">
+                        Cadastre a primeira empreiteira para começar.
+                    </p>
 
-                        <td>
+                    <a href="{{ url_for('nova_empresa') }}"
+                       class="btn btn-primary">
 
-                            {% if empresa.ativo %}
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Cadastrar empreiteira
 
-                                <span class="badge bg-success-subtle text-success px-3 py-2">
+                    </a>
 
-                                    <i class="bi bi-check-circle me-1"></i>
+                </div>
 
-                                    Ativa
-
-                                </span>
-
-                            {% else %}
-
-                                <span class="badge bg-danger-subtle text-danger px-3 py-2">
-
-                                    <i class="bi bi-x-circle me-1"></i>
-
-                                    Inativa
-
-                                </span>
-
-                            {% endif %}
-
-                        </td>
-
-
-                        <!-- AÇÕES -->
-
-                        <td class="text-end px-4">
-
-                            <div class="d-flex justify-content-end gap-2 flex-wrap">
-
-                                <!-- ABRIR EMPRESA -->
-
-                                <a
-                                    href="{{ url_for('admin_empresa_detalhes', empresa_id=empresa.id) }}"
-                                    class="btn btn-sm btn-outline-primary"
-                                    title="Visualizar empresa"
-                                >
-
-                                    <i class="bi bi-eye me-1"></i>
-
-                                    Visualizar
-
-                                </a>
-
-
-                                <!-- EDITAR -->
-
-                                <a
-                                    href="{{ url_for('admin_editar_empresa', empresa_id=empresa.id) }}"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    title="Editar empresa"
-                                >
-
-                                    <i class="bi bi-pencil"></i>
-
-                                </a>
-
-                            </div>
-
-                        </td>
-
-                    </tr>
-
-
-                    {% else %}
-
-                    <tr>
-
-                        <td
-                            colspan="5"
-                            class="text-center py-5"
-                        >
-
-                            <div class="text-muted">
-
-                                <div
-                                    class="
-                                        bg-light
-                                        rounded-circle
-                                        d-inline-flex
-                                        align-items-center
-                                        justify-content-center
-                                        mb-3
-                                    "
-                                    style="width: 80px; height: 80px;"
-                                >
-
-                                    <i class="bi bi-buildings fs-1"></i>
-
-                                </div>
-
-
-                                <h6 class="fw-bold">
-
-                                    Nenhuma empresa cadastrada
-
-                                </h6>
-
-
-                                <p class="small mb-3">
-
-                                    Comece cadastrando a primeira empresa da plataforma.
-
-                                </p>
-
-
-                                <a
-                                    href="{{ url_for('admin_nova_empresa') }}"
-                                    class="btn btn-primary"
-                                >
-
-                                    <i class="bi bi-plus-lg me-1"></i>
-
-                                    Cadastrar primeira empresa
-
-                                </a>
-
-                            </div>
-
-                        </td>
-
-                    </tr>
-
-                    {% endfor %}
-
-
-                    <!-- RESULTADO DA BUSCA -->
-
-                    <tr id="semResultados" style="display: none;">
-
-                        <td
-                            colspan="5"
-                            class="text-center py-5"
-                        >
-
-                            <div class="text-muted">
-
-                                <i class="bi bi-search fs-1 d-block mb-3"></i>
-
-                                <h6 class="fw-bold">
-                                    Nenhuma empresa encontrada
-                                </h6>
-
-                                <p class="small mb-0">
-                                    Tente alterar o nome ou o filtro de status.
-                                </p>
-
-                            </div>
-
-                        </td>
-
-                    </tr>
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-
-        <!-- RODAPÉ DA TABELA -->
-
-        <div class="card-footer bg-white border-0 px-4 py-3">
-
-            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
-
-                <span class="small text-muted">
-
-                    <i class="bi bi-info-circle me-1"></i>
-
-                    Empresas cadastradas na plataforma.
-
-                </span>
-
-
-                <span
-                    class="small text-muted"
-                    id="contadorEmpresas"
-                >
-                    Exibindo empresas
-                </span>
-
-            </div>
+            {% endif %}
 
         </div>
 
     </div>
 
 
-    <!-- =========================================================
-         AÇÕES ADMINISTRATIVAS
-    ========================================================== -->
+    <!-- AVISO DE SEPARAÇÃO -->
+    <div class="alert alert-info border-0 shadow-sm mt-4">
 
-    <div class="row g-4 mt-1">
+        <div class="d-flex gap-2">
 
-
-        <!-- NOVA EMPRESA -->
-
-        <div class="col-12 col-md-4">
-
-            <a
-                href="{{ url_for('admin_nova_empresa') }}"
-                class="text-decoration-none"
-            >
-
-                <div class="card border-0 shadow-sm h-100">
-
-                    <div class="card-body p-4">
-
-                        <div
-                            class="
-                                bg-primary-subtle
-                                text-primary
-                                rounded-3
-                                d-inline-flex
-                                p-3
-                                mb-3
-                            "
-                        >
-
-                            <i class="bi bi-building-add fs-4"></i>
-
-                        </div>
-
-
-                        <h6 class="fw-bold">
-                            Cadastrar empresa
-                        </h6>
-
-
-                        <p class="text-muted small mb-0">
-
-                            Adicione uma nova construtora ou empreiteira à plataforma.
-
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </a>
-
-        </div>
-
-
-        <!-- GERENCIAR EMPRESAS -->
-
-        <div class="col-12 col-md-4">
-
-            <div class="card border-0 shadow-sm h-100">
-
-                <div class="card-body p-4">
-
-                    <div
-                        class="
-                            bg-success-subtle
-                            text-success
-                            rounded-3
-                            d-inline-flex
-                            p-3
-                            mb-3
-                        "
-                    >
-
-                        <i class="bi bi-people fs-4"></i>
-
-                    </div>
-
-
-                    <h6 class="fw-bold">
-                        Administradores
-                    </h6>
-
-
-                    <p class="text-muted small mb-0">
-
-                        Os administradores de cada empresa poderão ser criados dentro do cadastro da empresa.
-
-                    </p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- SEGURANÇA -->
-
-        <div class="col-12 col-md-4">
-
-            <div class="card border-0 shadow-sm h-100">
-
-                <div class="card-body p-4">
-
-                    <div
-                        class="
-                            bg-danger-subtle
-                            text-danger
-                            rounded-3
-                            d-inline-flex
-                            p-3
-                            mb-3
-                        "
-                    >
-
-                        <i class="bi bi-shield-check fs-4"></i>
-
-                    </div>
-
-
-                    <h6 class="fw-bold">
-                        Controle de acesso
-                    </h6>
-
-
-                    <p class="text-muted small mb-0">
-
-                        O painel ADM controla empresas, usuários e permissões da plataforma.
-
-                    </p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- =========================================================
-         INFORMAÇÃO
-    ========================================================== -->
-
-    <div class="alert alert-light border mt-4 mb-0">
-
-        <div class="d-flex gap-3 align-items-start">
-
-            <i class="bi bi-lightbulb text-warning fs-4"></i>
+            <i class="bi bi-info-circle fs-5"></i>
 
             <div>
 
-                <strong>
-                    Próxima evolução
-                </strong>
+                <strong>Painel do Administrador Geral</strong>
 
-                <div class="small text-muted mt-1">
-
-                    O próximo módulo permitirá abrir uma empresa diretamente pelo painel ADM,
-                    visualizar o ambiente operacional dela e administrar usuários, obras,
-                    materiais e solicitações mantendo os dados de cada empresa isolados.
-
+                <div class="small mt-1">
+                    Este painel é destinado exclusivamente ao gerenciamento
+                    e monitoramento das empreiteiras cadastradas.
+                    As operações de obras, funcionários, materiais,
+                    ferramentas, estoque, solicitações e compras ficam
+                    dentro do painel individual de cada empreiteira.
                 </div>
 
             </div>
@@ -902,132 +301,5 @@
     </div>
 
 </div>
-
-
-<!-- =========================================================
-     JAVASCRIPT — BUSCA E FILTRO
-========================================================== -->
-
-<script>
-
-document.addEventListener("DOMContentLoaded", function () {
-
-    const campoBusca = document.getElementById("buscaEmpresa");
-    const filtroStatus = document.getElementById("filtroStatus");
-    const linhas = Array.from(
-        document.querySelectorAll(".linha-empresa")
-    );
-
-    const semResultados =
-        document.getElementById("semResultados");
-
-    const contador =
-        document.getElementById("contadorEmpresas");
-
-
-    function atualizarLista() {
-
-        const busca =
-            (campoBusca.value || "")
-            .toLowerCase()
-            .trim();
-
-        const statusSelecionado =
-            filtroStatus.value;
-
-        let exibidas = 0;
-
-
-        linhas.forEach(function (linha) {
-
-            const nome =
-                linha.dataset.nome || "";
-
-            const razao =
-                linha.dataset.razao || "";
-
-            const status =
-                linha.dataset.status || "";
-
-
-            const correspondeBusca =
-                !busca ||
-                nome.includes(busca) ||
-                razao.includes(busca);
-
-
-            const correspondeStatus =
-                statusSelecionado === "todas" ||
-                status === statusSelecionado;
-
-
-            const mostrar =
-                correspondeBusca &&
-                correspondeStatus;
-
-
-            linha.style.display =
-                mostrar ? "" : "none";
-
-
-            if (mostrar) {
-                exibidas++;
-            }
-
-        });
-
-
-        if (linhas.length > 0) {
-
-            semResultados.style.display =
-                exibidas === 0 ? "" : "none";
-
-        }
-
-
-        if (contador) {
-
-            if (exibidas === 1) {
-
-                contador.textContent =
-                    "1 empresa exibida";
-
-            } else {
-
-                contador.textContent =
-                    `${exibidas} empresas exibidas`;
-
-            }
-
-        }
-
-    }
-
-
-    if (campoBusca) {
-
-        campoBusca.addEventListener(
-            "input",
-            atualizarLista
-        );
-
-    }
-
-
-    if (filtroStatus) {
-
-        filtroStatus.addEventListener(
-            "change",
-            atualizarLista
-        );
-
-    }
-
-
-    atualizarLista();
-
-});
-
-</script>
 
 {% endblock %}
