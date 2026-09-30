@@ -39,13 +39,11 @@ app.config["SECRET_KEY"] = os.getenv(
     "chave-temporaria-construtora-pro"
 )
 
-
 database_url = os.getenv("DATABASE_URL")
 
 if database_url:
 
     if database_url.startswith("postgres://"):
-
         database_url = database_url.replace(
             "postgres://",
             "postgresql://",
@@ -60,11 +58,9 @@ else:
         "sqlite:///construtora_pro.db"
     )
 
-
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
-
 
 login_manager = LoginManager(app)
 
@@ -199,10 +195,16 @@ class Usuario(UserMixin, db.Model):
         if not self.senha_hash:
             return False
 
-        return check_password_hash(
-            self.senha_hash,
-            senha
-        )
+        try:
+
+            return check_password_hash(
+                self.senha_hash,
+                senha
+            )
+
+        except Exception:
+
+            return False
 
 
 class Obra(db.Model):
@@ -500,10 +502,6 @@ def login_obrigatorio(funcao):
                 url_for("login")
             )
 
-        # ----------------------------------------------------
-        # USUÁRIO VINCULADO A EMPRESA
-        # ----------------------------------------------------
-
         if usuario.empresa_id:
 
             empresa = empresa_usuario_atual()
@@ -550,7 +548,7 @@ def admin_obrigatorio(funcao):
 
 
 # ============================================================
-# CONTEXT PROCESSOR
+# CONTEXTO GLOBAL
 # ============================================================
 
 @app.context_processor
@@ -580,81 +578,82 @@ def inicializar_banco():
 
     with app.app_context():
 
-        db.create_all()
+        try:
 
-        # ----------------------------------------------------
-        # EMPRESA PADRÃO
-        # ----------------------------------------------------
+            db.create_all()
 
-        empresa_padrao = Empresa.query.first()
+            empresa_padrao = Empresa.query.first()
 
-        if not empresa_padrao:
+            if not empresa_padrao:
 
-            empresa_padrao = Empresa(
-                razao_social="Empresa de Construção",
-                nome_fantasia="Construtora Pro",
-                ativo=True
-            )
-
-            db.session.add(
-                empresa_padrao
-            )
-
-            db.session.commit()
-
-        # ----------------------------------------------------
-        # ADMINISTRADOR DA PLATAFORMA
-        # ----------------------------------------------------
-
-        admin_usuario = (
-            os.getenv(
-                "ADMIN_USER",
-                "admin"
-            )
-            or "admin"
-        ).strip()
-
-        admin_senha = os.getenv(
-            "ADMIN_PASSWORD"
-        )
-
-        if admin_usuario:
-
-            admin_existente = Usuario.query.filter(
-                db.func.lower(
-                    Usuario.usuario
-                ) == admin_usuario.lower()
-            ).first()
-
-            if admin_existente:
-
-                admin_existente.funcao = "ADM"
-
-                admin_existente.empresa_id = None
-
-                admin_existente.ativo = True
-
-                db.session.commit()
-
-            elif admin_senha:
-
-                novo_admin = Usuario(
-                    nome="Administrador da Plataforma",
-                    usuario=admin_usuario,
-                    funcao="ADM",
-                    ativo=True,
-                    empresa_id=None
-                )
-
-                novo_admin.definir_senha(
-                    admin_senha
+                empresa_padrao = Empresa(
+                    razao_social="Empresa de Construção",
+                    nome_fantasia="Construtora Pro",
+                    ativo=True
                 )
 
                 db.session.add(
-                    novo_admin
+                    empresa_padrao
                 )
 
                 db.session.commit()
+
+            admin_usuario = (
+                os.getenv(
+                    "ADMIN_USER",
+                    "admin"
+                )
+                or "admin"
+            ).strip()
+
+            admin_senha = os.getenv(
+                "ADMIN_PASSWORD"
+            )
+
+            if admin_usuario:
+
+                admin_existente = Usuario.query.filter(
+                    db.func.lower(
+                        Usuario.usuario
+                    ) == admin_usuario.lower()
+                ).first()
+
+                if admin_existente:
+
+                    admin_existente.funcao = "ADM"
+                    admin_existente.empresa_id = None
+                    admin_existente.ativo = True
+
+                    db.session.commit()
+
+                elif admin_senha:
+
+                    novo_admin = Usuario(
+                        nome="Administrador da Plataforma",
+                        usuario=admin_usuario,
+                        funcao="ADM",
+                        ativo=True,
+                        empresa_id=None
+                    )
+
+                    novo_admin.definir_senha(
+                        admin_senha
+                    )
+
+                    db.session.add(
+                        novo_admin
+                    )
+
+                    db.session.commit()
+
+        except Exception as erro:
+
+            db.session.rollback()
+
+            print(
+                "ERRO AO INICIALIZAR BANCO:",
+                repr(erro)
+            )
 
 
 # ============================================================
@@ -740,10 +739,6 @@ def login():
             return render_template(
                 "login.html"
             )
-
-        # ----------------------------------------------------
-        # VERIFICA EMPRESA
-        # ----------------------------------------------------
 
         if usuario.empresa_id:
 
@@ -852,83 +847,86 @@ def admin_dashboard():
 @admin_obrigatorio
 def admin_nova_empresa():
 
-    if request.method == "POST":
+    if request.method == "GET":
 
-        razao_social = (
-            request.form.get("razao_social")
-            or ""
-        ).strip()
-
-        nome_fantasia = (
-            request.form.get("nome_fantasia")
-            or ""
-        ).strip()
-
-        cnpj = (
-            request.form.get("cnpj")
-            or ""
-        ).strip()
-
-        telefone = (
-            request.form.get("telefone")
-            or ""
-        ).strip()
-
-        email = (
-            request.form.get("email")
-            or ""
-        ).strip()
-
-        endereco = (
-            request.form.get("endereco")
-            or ""
-        ).strip()
-
-        if not razao_social:
-
-            flash(
-                "Informe a razão social da empresa.",
-                "warning"
-            )
-
-            return render_template(
-                "empresa_form.html"
-            )
-
-        # ----------------------------------------------------
-        # NORMALIZA CNPJ
-        # ----------------------------------------------------
-
-        cnpj_normalizado = (
-            cnpj.replace(".", "")
-            .replace("/", "")
-            .replace("-", "")
-            .replace(" ", "")
+        return render_template(
+            "empresa_form.html",
+            empresa=None,
+            titulo="Nova empresa"
         )
 
-        if cnpj_normalizado:
+    razao_social = (
+        request.form.get("razao_social")
+        or ""
+    ).strip()
 
-            cnpj_existente = Empresa.query.filter(
-                db.func.replace(
-                    db.func.replace(
-                        db.func.replace(
-                            db.func.replace(
-                                Empresa.cnpj,
-                                ".",
-                                ""
-                            ),
-                            "/",
-                            ""
-                        ),
-                        "-",
-                        ""
-                    ),
-                    " ",
-                    ""
-                ) == cnpj_normalizado
-            ).first()
+    nome_fantasia = (
+        request.form.get("nome_fantasia")
+        or ""
+    ).strip()
 
-            if cnpj_existente:
+    cnpj = (
+        request.form.get("cnpj")
+        or ""
+    ).strip()
+
+    telefone = (
+        request.form.get("telefone")
+        or ""
+    ).strip()
+
+    email = (
+        request.form.get("email")
+        or ""
+    ).strip()
+
+    endereco = (
+        request.form.get("endereco")
+        or ""
+    ).strip()
+
+    if not razao_social:
+
+        flash(
+            "Informe a razão social da empresa.",
+            "warning"
+        )
+
+        return render_template(
+            "empresa_form.html",
+            empresa=None,
+            titulo="Nova empresa"
+        )
+
+    # --------------------------------------------------------
+    # NORMALIZA CNPJ
+    # --------------------------------------------------------
+
+    cnpj_normalizado = (
+        cnpj.replace(".", "")
+        .replace("/", "")
+        .replace("-", "")
+        .replace(" ", "")
+    )
+
+    if cnpj_normalizado:
+
+        empresas_existentes = Empresa.query.all()
+
+        for existente in empresas_existentes:
+
+            existente_normalizado = (
+                (existente.cnpj or "")
+                .replace(".", "")
+                .replace("/", "")
+                .replace("-", "")
+                .replace(" ", "")
+            )
+
+            if (
+                existente_normalizado
+                and existente_normalizado == cnpj_normalizado
+            ):
 
                 flash(
                     "Já existe uma empresa cadastrada com este CNPJ.",
@@ -936,53 +934,66 @@ def admin_nova_empresa():
                 )
 
                 return render_template(
-                    "empresa_form.html"
+                    "empresa_form.html",
+                    empresa=None,
+                    titulo="Nova empresa"
                 )
 
-        empresa = Empresa(
-            razao_social=razao_social,
-            nome_fantasia=nome_fantasia or None,
-            cnpj=cnpj or None,
-            telefone=telefone or None,
-            email=email or None,
-            endereco=endereco or None,
-            ativo=True
+        cnpj_final = cnpj
+
+    else:
+
+        cnpj_final = None
+
+    empresa = Empresa(
+        razao_social=razao_social,
+        nome_fantasia=nome_fantasia or None,
+        cnpj=cnpj_final,
+        telefone=telefone or None,
+        email=email or None,
+        endereco=endereco or None,
+        ativo=True
+    )
+
+    try:
+
+        db.session.add(
+            empresa
         )
 
-        try:
+        db.session.commit()
 
-            db.session.add(empresa)
+    except Exception as erro:
 
-            db.session.commit()
+        db.session.rollback()
 
-        except Exception:
-
-            db.session.rollback()
-
-            flash(
-                "Não foi possível cadastrar a empresa. "
-                "Verifique os dados e tente novamente.",
-                "danger"
-            )
-
-            return render_template(
-                "empresa_form.html"
-            )
+        print(
+            "ERRO AO CADASTRAR EMPRESA:",
+            repr(erro)
+        )
 
         flash(
-            "Empresa cadastrada com sucesso.",
-            "success"
+            "Não foi possível cadastrar a empresa. "
+            "Verifique se o CNPJ ou outro dado já está cadastrado.",
+            "danger"
         )
 
-        return redirect(
-            url_for(
-                "admin_empresa_detalhes",
-                empresa_id=empresa.id
-            )
+        return render_template(
+            "empresa_form.html",
+            empresa=None,
+            titulo="Nova empresa"
         )
 
-    return render_template(
-        "empresa_form.html"
+    flash(
+        "Empresa cadastrada com sucesso.",
+        "success"
+    )
+
+    return redirect(
+        url_for(
+            "admin_empresa_detalhes",
+            empresa_id=empresa.id
+        )
     )
 
 
@@ -1034,19 +1045,21 @@ def admin_empresa_detalhes(empresa_id):
 
     total_obras = len(obras)
 
+    status_inativos = {
+        "concluida",
+        "concluído",
+        "concluída",
+        "cancelada",
+        "cancelado",
+    }
+
     obras_ativas = sum(
         1
         for obra in obras
         if (
             obra.status
             and obra.status.strip().lower()
-            not in (
-                "concluida",
-                "concluído",
-                "concluida",
-                "cancelada",
-                "cancelado",
-            )
+            not in status_inativos
         )
     )
 
@@ -1116,58 +1129,89 @@ def admin_editar_empresa(empresa_id):
             url_for("admin_dashboard")
         )
 
-    if request.method == "POST":
+    if request.method == "GET":
 
-        razao_social = (
-            request.form.get("razao_social")
-            or ""
-        ).strip()
+        return render_template(
+            "empresa_form.html",
+            empresa=empresa,
+            titulo="Editar empresa"
+        )
 
-        nome_fantasia = (
-            request.form.get("nome_fantasia")
-            or ""
-        ).strip()
+    razao_social = (
+        request.form.get("razao_social")
+        or ""
+    ).strip()
 
-        cnpj = (
-            request.form.get("cnpj")
-            or ""
-        ).strip()
+    nome_fantasia = (
+        request.form.get("nome_fantasia")
+        or ""
+    ).strip()
 
-        telefone = (
-            request.form.get("telefone")
-            or ""
-        ).strip()
+    cnpj = (
+        request.form.get("cnpj")
+        or ""
+    ).strip()
 
-        email = (
-            request.form.get("email")
-            or ""
-        ).strip()
+    telefone = (
+        request.form.get("telefone")
+        or ""
+    ).strip()
 
-        endereco = (
-            request.form.get("endereco")
-            or ""
-        ).strip()
+    email = (
+        request.form.get("email")
+        or ""
+    ).strip()
 
-        if not razao_social:
+    endereco = (
+        request.form.get("endereco")
+        or ""
+    ).strip()
 
-            flash(
-                "Informe a razão social da empresa.",
-                "warning"
+    ativo = (
+        request.form.get("ativo")
+        == "on"
+    )
+
+    if not razao_social:
+
+        flash(
+            "Informe a razão social da empresa.",
+            "warning"
+        )
+
+        return render_template(
+            "empresa_form.html",
+            empresa=empresa,
+            titulo="Editar empresa"
+        )
+
+    cnpj_normalizado = (
+        cnpj.replace(".", "")
+        .replace("/", "")
+        .replace("-", "")
+        .replace(" ", "")
+    )
+
+    if cnpj_normalizado:
+
+        empresas_existentes = Empresa.query.filter(
+            Empresa.id != empresa.id
+        ).all()
+
+        for outra in empresas_existentes:
+
+            outro_cnpj = (
+                (outra.cnpj or "")
+                .replace(".", "")
+                .replace("/", "")
+                .replace("-", "")
+                .replace(" ", "")
             )
 
-            return render_template(
-                "empresa_form.html",
-                empresa=empresa
-            )
-
-        if cnpj:
-
-            outra_empresa = Empresa.query.filter(
-                Empresa.cnpj == cnpj,
-                Empresa.id != empresa.id
-            ).first()
-
-            if outra_empresa:
+            if (
+                outro_cnpj
+                and outro_cnpj == cnpj_normalizado
+            ):
 
                 flash(
                     "Este CNPJ já está cadastrado em outra empresa.",
@@ -1176,64 +1220,68 @@ def admin_editar_empresa(empresa_id):
 
                 return render_template(
                     "empresa_form.html",
-                    empresa=empresa
+                    empresa=empresa,
+                    titulo="Editar empresa"
                 )
 
-        empresa.razao_social = razao_social
+    empresa.razao_social = razao_social
 
-        empresa.nome_fantasia = (
-            nome_fantasia or None
+    empresa.nome_fantasia = (
+        nome_fantasia or None
+    )
+
+    empresa.cnpj = (
+        cnpj or None
+    )
+
+    empresa.telefone = (
+        telefone or None
+    )
+
+    empresa.email = (
+        email or None
+    )
+
+    empresa.endereco = (
+        endereco or None
+    )
+
+    empresa.ativo = ativo
+
+    try:
+
+        db.session.commit()
+
+    except Exception as erro:
+
+        db.session.rollback()
+
+        print(
+            "ERRO AO EDITAR EMPRESA:",
+            repr(erro)
         )
-
-        empresa.cnpj = (
-            cnpj or None
-        )
-
-        empresa.telefone = (
-            telefone or None
-        )
-
-        empresa.email = (
-            email or None
-        )
-
-        empresa.endereco = (
-            endereco or None
-        )
-
-        try:
-
-            db.session.commit()
-
-        except Exception:
-
-            db.session.rollback()
-
-            flash(
-                "Não foi possível atualizar a empresa.",
-                "danger"
-            )
-
-            return render_template(
-                "empresa_form.html",
-                empresa=empresa
-            )
 
         flash(
-            "Empresa atualizada com sucesso.",
-            "success"
+            "Não foi possível atualizar a empresa.",
+            "danger"
         )
 
-        return redirect(
-            url_for(
-                "admin_empresa_detalhes",
-                empresa_id=empresa.id
-            )
+        return render_template(
+            "empresa_form.html",
+            empresa=empresa,
+            titulo="Editar empresa"
         )
 
-    return render_template(
-        "empresa_form.html",
-        empresa=empresa
+    flash(
+        "Empresa atualizada com sucesso.",
+        "success"
+    )
+
+    return redirect(
+        url_for(
+            "admin_empresa_detalhes",
+            empresa_id=empresa.id
+        )
     )
 
 
@@ -1270,9 +1318,14 @@ def admin_alternar_status_empresa(empresa_id):
 
         db.session.commit()
 
-    except Exception:
+    except Exception as erro:
 
         db.session.rollback()
+
+        print(
+            "ERRO AO ALTERAR STATUS DA EMPRESA:",
+            repr(erro)
+        )
 
         flash(
             "Não foi possível alterar o status da empresa.",
@@ -1305,6 +1358,110 @@ def admin_alternar_status_empresa(empresa_id):
             "admin_empresa_detalhes",
             empresa_id=empresa.id
         )
+    )
+
+
+# ============================================================
+# EXCLUIR EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>/excluir",
+    methods=["POST"]
+)
+@admin_obrigatorio
+def admin_excluir_empresa(empresa_id):
+
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
+    )
+
+    if not empresa:
+
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    quantidade_usuarios = Usuario.query.filter_by(
+        empresa_id=empresa.id
+    ).count()
+
+    quantidade_obras = Obra.query.filter_by(
+        empresa_id=empresa.id
+    ).count()
+
+    if quantidade_usuarios > 0:
+
+        flash(
+            "Esta empresa possui usuários vinculados. "
+            "Desative ou remova os usuários antes de excluí-la.",
+            "warning"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+    if quantidade_obras > 0:
+
+        flash(
+            "Esta empresa possui obras cadastradas. "
+            "Remova ou trate as obras antes de excluir a empresa.",
+            "warning"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+    try:
+
+        db.session.delete(
+            empresa
+        )
+
+        db.session.commit()
+
+    except Exception as erro:
+
+        db.session.rollback()
+
+        print(
+            "ERRO AO EXCLUIR EMPRESA:",
+            repr(erro)
+        )
+
+        flash(
+            "Não foi possível excluir a empresa.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+    flash(
+        "Empresa excluída com sucesso.",
+        "success"
+    )
+
+    return redirect(
+        url_for("admin_dashboard")
     )
 
 
@@ -1366,13 +1523,6 @@ def admin_novo_usuario_empresa(empresa_id):
             or ""
         )
 
-        # ----------------------------------------------------
-        # CORREÇÃO PRINCIPAL
-        #
-        # Aceita os dois nomes para evitar incompatibilidade
-        # com versões diferentes do formulário.
-        # ----------------------------------------------------
-
         confirmar_senha = (
             request.form.get("confirmacao")
             or request.form.get("confirmar_senha")
@@ -1403,16 +1553,12 @@ def admin_novo_usuario_empresa(empresa_id):
                 empresa=empresa
             )
 
-        # ----------------------------------------------------
-        # NORMALIZA USUÁRIO
-        # ----------------------------------------------------
-
         usuario_digitado = usuario_digitado.lower()
 
         usuario_existente = Usuario.query.filter(
             db.func.lower(
                 Usuario.usuario
-            ) == usuario_digitado.lower()
+            ) == usuario_digitado
         ).first()
 
         if usuario_existente:
@@ -1471,9 +1617,14 @@ def admin_novo_usuario_empresa(empresa_id):
 
             db.session.commit()
 
-        except Exception:
+        except Exception as erro:
 
             db.session.rollback()
+
+            print(
+                "ERRO AO CRIAR ADMINISTRADOR:",
+                repr(erro)
+            )
 
             flash(
                 "Não foi possível criar o administrador. "
@@ -1505,7 +1656,7 @@ def admin_novo_usuario_empresa(empresa_id):
 
 
 # ============================================================
-# ATIVAR / DESATIVAR USUÁRIO DA EMPRESA
+# ATIVAR / DESATIVAR USUÁRIO
 # ============================================================
 
 @app.route(
@@ -1629,9 +1780,14 @@ def admin_alternar_status_usuario_empresa(
 
         db.session.commit()
 
-    except Exception:
+    except Exception as erro:
 
         db.session.rollback()
+
+        print(
+            "ERRO AO ALTERAR STATUS DO USUÁRIO:",
+            repr(erro)
+        )
 
         flash(
             "Não foi possível alterar o status do usuário.",
@@ -1705,6 +1861,7 @@ def dashboard():
                 (
                     "concluida",
                     "concluído",
+                    "concluída",
                     "cancelada",
                     "cancelado",
                 )
@@ -1769,15 +1926,14 @@ def dashboard():
                 (
                     "concluida",
                     "concluído",
+                    "concluída",
                     "cancelada",
                     "cancelado",
                 )
             )
         ).count()
 
-        total_solicitacoes = (
-            Solicitacao.query.count()
-        )
+        total_solicitacoes = Solicitacao.query.count()
 
         solicitacoes_pendentes = (
             Solicitacao.query.filter(
@@ -1975,9 +2131,14 @@ def nova_obra():
 
             db.session.commit()
 
-        except Exception:
+        except Exception as erro:
 
             db.session.rollback()
+
+            print(
+                "ERRO AO CADASTRAR OBRA:",
+                repr(erro)
+            )
 
             flash(
                 "Não foi possível cadastrar a obra.",
@@ -2103,11 +2264,11 @@ def novo_material():
         try:
 
             estoque_minimo = float(
-                estoque_minimo_str
+                estoque_minimo_str.replace(",", ".")
             )
 
             estoque_atual = float(
-                estoque_atual_str
+                estoque_atual_str.replace(",", ".")
             )
 
         except (ValueError, TypeError):
@@ -2151,9 +2312,14 @@ def novo_material():
 
             db.session.commit()
 
-        except Exception:
+        except Exception as erro:
 
             db.session.rollback()
+
+            print(
+                "ERRO AO CADASTRAR MATERIAL:",
+                repr(erro)
+            )
 
             flash(
                 "Não foi possível cadastrar o material.",
@@ -2274,7 +2440,7 @@ def nova_solicitacao():
             )
 
             quantidade = float(
-                quantidade_str
+                quantidade_str.replace(",", ".")
             )
 
         except (ValueError, TypeError):
@@ -2350,9 +2516,14 @@ def nova_solicitacao():
 
             db.session.commit()
 
-        except Exception:
+        except Exception as erro:
 
             db.session.rollback()
+
+            print(
+                "ERRO AO CRIAR SOLICITAÇÃO:",
+                repr(erro)
+            )
 
             flash(
                 "Não foi possível criar a solicitação.",
@@ -2399,19 +2570,57 @@ def nova_solicitacao():
 @app.errorhandler(404)
 def pagina_nao_encontrada(error):
 
-    return render_template(
-        "base.html"
-    ), 404
+    try:
+
+        return render_template(
+            "error.html",
+            codigo=404,
+            titulo="Página não encontrada",
+            mensagem="A página que você tentou acessar não existe."
+        ), 404
+
+    except Exception:
+
+        return (
+            "<h1>404 - Página não encontrada</h1>",
+            404
+        )
 
 
 @app.errorhandler(500)
 def erro_servidor(error):
 
-    db.session.rollback()
+    try:
 
-    return render_template(
-        "base.html"
-    ), 500
+        db.session.rollback()
+
+    except Exception:
+
+        pass
+
+    print(
+        "ERRO 500:",
+        repr(error)
+    )
+
+    try:
+
+        return render_template(
+            "error.html",
+            codigo=500,
+            titulo="Erro interno",
+            mensagem=(
+                "Ocorreu um erro interno no sistema. "
+                "A operação não foi concluída."
+            )
+        ), 500
+
+    except Exception:
+
+        return (
+            "<h1>500 - Erro interno do servidor</h1>",
+            500
+        )
 
 
 # ============================================================
