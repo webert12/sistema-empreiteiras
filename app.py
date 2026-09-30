@@ -5,13 +5,20 @@ from functools import wraps
 from flask import (
     Flask,
     render_template,
-    request,
     redirect,
     url_for,
-    session,
+    request,
     flash,
+    session,
 )
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    current_user,
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -23,28 +30,31 @@ app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.getenv(
     "FLASK_SECRET_KEY",
-    "chave-local-apenas-para-desenvolvimento"
+    "chave-temporaria-construtora-pro"
 )
 
-database_url = os.getenv("DATABASE_URL", "").strip()
-
-# Compatibilidade com URLs antigas do Render
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace(
-        "postgres://",
-        "postgresql://",
-        1
-    )
+database_url = os.getenv("DATABASE_URL")
 
 if database_url:
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace(
+            "postgres://",
+            "postgresql://",
+            1
+        )
+
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 else:
-    # Permite testar localmente antes de configurar o PostgreSQL
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///empreiteiras.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///construtora_pro.db"
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Faça login para continuar."
+login_manager.login_message_category = "warning"
 
 
 # ============================================================
@@ -54,19 +64,16 @@ db = SQLAlchemy(app)
 class Empresa(db.Model):
     __tablename__ = "empresas"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
+    id = db.Column(db.Integer, primary_key=True)
 
     razao_social = db.Column(
-        db.String(150),
+        db.String(200),
         nullable=False
     )
 
     nome_fantasia = db.Column(
-        db.String(150),
-        nullable=False
+        db.String(200),
+        nullable=True
     )
 
     cnpj = db.Column(
@@ -86,7 +93,7 @@ class Empresa(db.Model):
     )
 
     endereco = db.Column(
-        db.String(255),
+        db.String(300),
         nullable=True
     )
 
@@ -109,7 +116,7 @@ class Empresa(db.Model):
     )
 
 
-class Usuario(db.Model):
+class Usuario(UserMixin, db.Model):
     __tablename__ = "usuarios"
 
     id = db.Column(
@@ -123,7 +130,7 @@ class Usuario(db.Model):
     )
 
     usuario = db.Column(
-        db.String(80),
+        db.String(100),
         unique=True,
         nullable=False
     )
@@ -135,8 +142,8 @@ class Usuario(db.Model):
 
     funcao = db.Column(
         db.String(50),
-        nullable=False,
-        default="funcionario"
+        default="funcionario",
+        nullable=False
     )
 
     ativo = db.Column(
@@ -157,9 +164,7 @@ class Usuario(db.Model):
     )
 
     def definir_senha(self, senha):
-        self.senha_hash = generate_password_hash(
-            senha
-        )
+        self.senha_hash = generate_password_hash(senha)
 
     def verificar_senha(self, senha):
         return check_password_hash(
@@ -183,17 +188,17 @@ class Obra(db.Model):
     )
 
     nome = db.Column(
-        db.String(150),
+        db.String(200),
         nullable=False
     )
 
     cliente = db.Column(
-        db.String(150),
+        db.String(200),
         nullable=True
     )
 
     endereco = db.Column(
-        db.String(255),
+        db.String(300),
         nullable=True
     )
 
@@ -213,7 +218,7 @@ class Obra(db.Model):
     )
 
     status = db.Column(
-        db.String(40),
+        db.String(50),
         default="planejamento",
         nullable=False
     )
@@ -243,12 +248,12 @@ class Material(db.Model):
     )
 
     nome = db.Column(
-        db.String(150),
+        db.String(200),
         nullable=False
     )
 
     descricao = db.Column(
-        db.String(255),
+        db.Text,
         nullable=True
     )
 
@@ -316,7 +321,7 @@ class Solicitacao(db.Model):
     )
 
     status = db.Column(
-        db.String(40),
+        db.String(50),
         default="pendente",
         nullable=False
     )
@@ -326,38 +331,58 @@ class Solicitacao(db.Model):
         default=datetime.utcnow
     )
 
-    obra = db.relationship("Obra")
+    obra = db.relationship(
+        "Obra",
+        backref=db.backref(
+            "solicitacoes",
+            lazy=True
+        )
+    )
 
-    material = db.relationship("Material")
+    material = db.relationship(
+        "Material",
+        backref=db.backref(
+            "solicitacoes",
+            lazy=True
+        )
+    )
 
-    usuario = db.relationship("Usuario")
-
-
-# ============================================================
-# FUNÇÕES AUXILIARES
-# ============================================================
-
-def usuario_atual():
-    """
-    Retorna o usuário atualmente autenticado.
-    """
-
-    usuario_id = session.get("usuario_id")
-
-    if not usuario_id:
-        return None
-
-    return db.session.get(
-        Usuario,
-        usuario_id
+    usuario = db.relationship(
+        "Usuario",
+        backref=db.backref(
+            "solicitacoes",
+            lazy=True
+        )
     )
 
 
-def eh_administrador():
-    """
-    Verifica se o usuário atual é o ADM global da plataforma.
-    """
+# ============================================================
+# LOGIN
+# ============================================================
 
+@login_manager.user_loader
+def carregar_usuario(user_id):
+    try:
+        return db.session.get(
+            Usuario,
+            int(user_id)
+        )
+    except (ValueError, TypeError):
+        return None
+
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def usuario_atual():
+    if current_user.is_authenticated:
+        return current_user
+
+    return None
+
+
+def eh_administrador():
     usuario = usuario_atual()
 
     if not usuario:
@@ -369,21 +394,46 @@ def eh_administrador():
     )
 
 
-def login_obrigatorio(func):
-    """
-    Protege rotas que exigem autenticação.
-    """
+def eh_administrador_empresa():
+    usuario = usuario_atual()
 
-    @wraps(func)
+    if not usuario:
+        return False
+
+    return (
+        usuario.funcao
+        and usuario.funcao.strip().lower()
+        in [
+            "administrador_empresa",
+            "admin_empresa",
+        ]
+    )
+
+
+def empresa_usuario_atual():
+    usuario = usuario_atual()
+
+    if not usuario:
+        return None
+
+    if not usuario.empresa_id:
+        return None
+
+    return db.session.get(
+        Empresa,
+        usuario.empresa_id
+    )
+
+
+def login_obrigatorio(funcao):
+    @wraps(funcao)
     def wrapper(*args, **kwargs):
 
-        if not session.get("usuario_id"):
-
+        if not current_user.is_authenticated:
             flash(
                 "Faça login para continuar.",
                 "warning"
             )
-
             return redirect(
                 url_for("login")
             )
@@ -391,11 +441,11 @@ def login_obrigatorio(func):
         usuario = usuario_atual()
 
         if not usuario or not usuario.ativo:
-
+            logout_user()
             session.clear()
 
             flash(
-                "Usuário inválido ou desativado.",
+                "Seu usuário está desativado.",
                 "danger"
             )
 
@@ -403,27 +453,18 @@ def login_obrigatorio(func):
                 url_for("login")
             )
 
-        # ----------------------------------------------------
-        # BLOQUEIO DE EMPRESA INATIVA
-        # ----------------------------------------------------
+        # Usuário vinculado a empresa
+        if usuario.empresa_id:
 
-        if (
-            usuario.empresa_id
-            and not eh_administrador()
-        ):
-
-            empresa = db.session.get(
-                Empresa,
-                usuario.empresa_id
-            )
+            empresa = empresa_usuario_atual()
 
             if not empresa or not empresa.ativo:
 
+                logout_user()
                 session.clear()
 
                 flash(
-                    "A empresa vinculada ao seu usuário "
-                    "está desativada.",
+                    "Esta empresa está inativa ou não foi encontrada.",
                     "danger"
                 )
 
@@ -431,77 +472,55 @@ def login_obrigatorio(func):
                     url_for("login")
                 )
 
-        return func(*args, **kwargs)
+        return funcao(*args, **kwargs)
 
     return wrapper
 
 
-def admin_obrigatorio():
-    """
-    Protege áreas exclusivas do administrador global.
+def admin_obrigatorio(funcao):
+    @wraps(funcao)
+    @login_obrigatorio
+    def wrapper(*args, **kwargs):
 
-    Retorna uma resposta Flask quando o acesso deve ser bloqueado.
-    Retorna None quando o usuário pode continuar.
-    """
+        if not eh_administrador():
+            flash(
+                "Acesso permitido somente ao administrador da plataforma.",
+                "danger"
+            )
 
-    usuario = usuario_atual()
+            return redirect(
+                url_for("dashboard")
+            )
 
-    if not usuario:
+        return funcao(*args, **kwargs)
 
-        flash(
-            "Faça login para acessar a administração.",
-            "warning"
-        )
+    return wrapper
 
-        return redirect(
-            url_for("login")
-        )
 
-    if not usuario.ativo:
-
-        session.clear()
-
-        flash(
-            "Usuário desativado.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("login")
-        )
-
-    if not eh_administrador():
-
-        flash(
-            "Acesso restrito ao administrador da plataforma.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("dashboard")
-        )
-
-    return None
-
+# ============================================================
+# CONTEXT PROCESSOR
+# ============================================================
 
 @app.context_processor
-def dados_globais():
+def contexto_global():
 
     usuario = usuario_atual()
+
+    empresa = None
+
+    if usuario and usuario.empresa_id:
+        empresa = empresa_usuario_atual()
 
     return {
         "usuario_logado": usuario,
-
-        "usuario_eh_admin": (
-            usuario is not None
-            and usuario.funcao
-            and usuario.funcao.strip().lower() == "adm"
-        )
+        "usuario_eh_admin": eh_administrador(),
+        "usuario_eh_admin_empresa": eh_administrador_empresa(),
+        "empresa_usuario_logado": empresa,
     }
 
 
 # ============================================================
-# INICIALIZAÇÃO DO BANCO
+# BANCO DE DADOS
 # ============================================================
 
 def inicializar_banco():
@@ -514,25 +533,24 @@ def inicializar_banco():
         # EMPRESA PADRÃO
         # ----------------------------------------------------
 
-        empresa = Empresa.query.first()
+        empresa_padrao = Empresa.query.first()
 
-        if not empresa:
+        if not empresa_padrao:
 
-            empresa = Empresa(
+            empresa_padrao = Empresa(
                 razao_social="Empresa de Construção",
-                nome_fantasia="Construtora",
+                nome_fantasia="Construtora Pro",
                 ativo=True
             )
 
             db.session.add(
-                empresa
+                empresa_padrao
             )
 
             db.session.commit()
 
-
         # ----------------------------------------------------
-        # ADMINISTRADOR GLOBAL
+        # ADMINISTRADOR DA PLATAFORMA
         # ----------------------------------------------------
 
         admin_usuario = os.getenv(
@@ -541,218 +559,186 @@ def inicializar_banco():
         ).strip()
 
         admin_senha = os.getenv(
-            "ADMIN_PASSWORD",
-            ""
+            "ADMIN_PASSWORD"
         )
 
+        if admin_usuario:
 
-        usuario = Usuario.query.filter_by(
-            usuario=admin_usuario
-        ).first()
+            admin_existente = Usuario.query.filter_by(
+                usuario=admin_usuario
+            ).first()
 
+            if admin_existente:
 
-        # ----------------------------------------------------
-        # SE O ADM JÁ EXISTIR
-        # ----------------------------------------------------
+                admin_existente.funcao = "ADM"
+                admin_existente.empresa_id = None
+                admin_existente.ativo = True
 
-        if usuario:
-
-            alterou = False
-
-
-            if (
-                not usuario.funcao
-                or usuario.funcao.strip().lower() != "adm"
-            ):
-
-                usuario.funcao = "ADM"
-
-                alterou = True
-
-
-            if usuario.empresa_id is not None:
-
-                usuario.empresa_id = None
-
-                alterou = True
-
-
-            if not usuario.ativo:
-
-                usuario.ativo = True
-
-                alterou = True
-
-
-            # A senha existente NÃO é alterada automaticamente.
-            # Isso evita trocar a senha do administrador a cada deploy.
-
-
-            if alterou:
+                # Não altera senha existente automaticamente.
 
                 db.session.commit()
 
+            elif admin_senha:
 
-        # ----------------------------------------------------
-        # SE O ADM AINDA NÃO EXISTIR
-        # ----------------------------------------------------
+                novo_admin = Usuario(
+                    nome="Administrador da Plataforma",
+                    usuario=admin_usuario,
+                    funcao="ADM",
+                    ativo=True,
+                    empresa_id=None
+                )
 
-        elif admin_senha:
+                novo_admin.definir_senha(
+                    admin_senha
+                )
 
-            usuario = Usuario(
-                nome="Administrador da Plataforma",
-                usuario=admin_usuario,
-                funcao="ADM",
-                empresa_id=None,
-                ativo=True
-            )
+                db.session.add(
+                    novo_admin
+                )
 
-            usuario.definir_senha(
-                admin_senha
-            )
-
-            db.session.add(
-                usuario
-            )
-
-            db.session.commit()
+                db.session.commit()
 
 
 # ============================================================
 # LOGIN
 # ============================================================
 
-@app.route(
-    "/login",
-    methods=["GET", "POST"]
-)
+@app.route("/login", methods=["GET", "POST"])
 def login():
 
-    if session.get("usuario_id"):
+    if current_user.is_authenticated:
 
-        usuario = usuario_atual()
+        if eh_administrador():
+            return redirect(
+                url_for("admin_dashboard")
+            )
 
-        if usuario and usuario.ativo:
-
-            # ADM GLOBAL
-            if eh_administrador():
-
-                return redirect(
-                    url_for("admin_dashboard")
-                )
-
-            # Usuário de empresa
-            if usuario.empresa_id:
-
-                empresa = db.session.get(
-                    Empresa,
-                    usuario.empresa_id
-                )
-
-                if empresa and empresa.ativo:
-
-                    return redirect(
-                        url_for("dashboard")
-                    )
-
-                session.clear()
-
-            else:
-
-                return redirect(
-                    url_for("dashboard")
-                )
-
-        session.clear()
-
+        return redirect(
+            url_for("dashboard")
+        )
 
     if request.method == "POST":
 
-        usuario_digitado = request.form.get(
-            "usuario",
-            ""
+        usuario_digitado = (
+            request.form.get("usuario")
+            or ""
         ).strip()
 
-        senha = request.form.get(
-            "senha",
-            ""
+        senha = (
+            request.form.get("senha")
+            or ""
         )
 
+        if not usuario_digitado or not senha:
 
-        usuario = Usuario.query.filter_by(
-            usuario=usuario_digitado
-        ).first()
-
-
-        if (
-            usuario
-            and usuario.ativo
-            and usuario.verificar_senha(senha)
-        ):
-
-            # ------------------------------------------------
-            # VERIFICA EMPRESA DO USUÁRIO
-            # ------------------------------------------------
-
-            if usuario.empresa_id:
-
-                empresa = db.session.get(
-                    Empresa,
-                    usuario.empresa_id
-                )
-
-                if not empresa or not empresa.ativo:
-
-                    flash(
-                        "A empresa vinculada a este usuário "
-                        "está desativada.",
-                        "danger"
-                    )
-
-                    return redirect(
-                        url_for("login")
-                    )
-
-
-            session.clear()
-
-            session["usuario_id"] = usuario.id
-
-
-            if eh_administrador():
-
-                return redirect(
-                    url_for("admin_dashboard")
-                )
-
-
-            return redirect(
-                url_for("dashboard")
+            flash(
+                "Informe usuário e senha.",
+                "warning"
             )
 
+            return render_template(
+                "login.html"
+            )
 
-        flash(
-            "Usuário ou senha inválidos.",
-            "danger"
+        usuario = Usuario.query.filter(
+            db.func.lower(
+                Usuario.usuario
+            ) == usuario_digitado.lower()
+        ).first()
+
+        if not usuario:
+
+            flash(
+                "Usuário ou senha inválidos.",
+                "danger"
+            )
+
+            return render_template(
+                "login.html"
+            )
+
+        if not usuario.ativo:
+
+            flash(
+                "Este usuário está desativado.",
+                "danger"
+            )
+
+            return render_template(
+                "login.html"
+            )
+
+        if not usuario.verificar_senha(senha):
+
+            flash(
+                "Usuário ou senha inválidos.",
+                "danger"
+            )
+
+            return render_template(
+                "login.html"
+            )
+
+        # ----------------------------------------------------
+        # VERIFICA EMPRESA
+        # ----------------------------------------------------
+
+        if usuario.empresa_id:
+
+            empresa = db.session.get(
+                Empresa,
+                usuario.empresa_id
+            )
+
+            if not empresa:
+
+                flash(
+                    "A empresa vinculada ao usuário não foi encontrada.",
+                    "danger"
+                )
+
+                return render_template(
+                    "login.html"
+                )
+
+            if not empresa.ativo:
+
+                flash(
+                    "Esta empresa está temporariamente inativa.",
+                    "danger"
+                )
+
+                return render_template(
+                    "login.html"
+                )
+
+        login_user(usuario)
+
+        session["usuario_id"] = usuario.id
+
+        if eh_administrador():
+
+            return redirect(
+                url_for("admin_dashboard")
+            )
+
+        return redirect(
+            url_for("dashboard")
         )
-
 
     return render_template(
         "login.html"
     )
 
 
-# ============================================================
-# LOGOUT
-# ============================================================
-
 @app.route("/logout")
 def logout():
 
+    logout_user()
     session.clear()
 
     flash(
-        "Sessão encerrada.",
+        "Você saiu do sistema.",
         "success"
     )
 
@@ -762,23 +748,12 @@ def logout():
 
 
 # ============================================================
-# PAINEL ADMINISTRATIVO GLOBAL
+# PAINEL ADMINISTRADOR DA PLATAFORMA
 # ============================================================
 
 @app.route("/admin")
-@login_obrigatorio
+@admin_obrigatorio
 def admin_dashboard():
-
-    bloqueio = admin_obrigatorio()
-
-    if bloqueio:
-
-        return bloqueio
-
-
-    # --------------------------------------------------------
-    # INDICADORES GERAIS
-    # --------------------------------------------------------
 
     total_empresas = Empresa.query.count()
 
@@ -788,172 +763,109 @@ def admin_dashboard():
 
     total_solicitacoes = Solicitacao.query.count()
 
-
-    # --------------------------------------------------------
-    # EMPRESAS
-    # --------------------------------------------------------
-
     empresas = Empresa.query.order_by(
-        Empresa.nome_fantasia.asc()
+        Empresa.nome_fantasia.asc(),
+        Empresa.razao_social.asc()
     ).all()
-
 
     return render_template(
         "admin_dashboard.html",
-
         total_empresas=total_empresas,
-
         total_usuarios=total_usuarios,
-
         total_obras=total_obras,
-
         total_solicitacoes=total_solicitacoes,
-
         empresas=empresas
     )
 
 
 # ============================================================
-# ADMIN - NOVA EMPRESA
+# NOVA EMPRESA
 # ============================================================
 
 @app.route(
     "/admin/empresas/nova",
     methods=["GET", "POST"]
 )
-@login_obrigatorio
+@admin_obrigatorio
 def admin_nova_empresa():
-
-    bloqueio = admin_obrigatorio()
-
-    if bloqueio:
-
-        return bloqueio
-
 
     if request.method == "POST":
 
-        razao_social = request.form.get(
-            "razao_social",
-            ""
+        razao_social = (
+            request.form.get("razao_social")
+            or ""
         ).strip()
 
-
-        nome_fantasia = request.form.get(
-            "nome_fantasia",
-            ""
+        nome_fantasia = (
+            request.form.get("nome_fantasia")
+            or ""
         ).strip()
 
-
-        cnpj = request.form.get(
-            "cnpj",
-            ""
+        cnpj = (
+            request.form.get("cnpj")
+            or ""
         ).strip()
 
-
-        telefone = request.form.get(
-            "telefone",
-            ""
+        telefone = (
+            request.form.get("telefone")
+            or ""
         ).strip()
 
-
-        email = request.form.get(
-            "email",
-            ""
+        email = (
+            request.form.get("email")
+            or ""
         ).strip()
 
-
-        endereco = request.form.get(
-            "endereco",
-            ""
+        endereco = (
+            request.form.get("endereco")
+            or ""
         ).strip()
-
-
-        # ----------------------------------------------------
-        # VALIDAÇÃO
-        # ----------------------------------------------------
 
         if not razao_social:
 
             flash(
                 "Informe a razão social da empresa.",
-                "danger"
+                "warning"
             )
 
             return render_template(
-                "empresa_form.html",
-                titulo="Nova empresa",
-                empresa=None
+                "empresa_form.html"
             )
-
-
-        # Nome fantasia é obrigatório no banco.
-        if not nome_fantasia:
-
-            nome_fantasia = razao_social
-
-
-        # ----------------------------------------------------
-        # CNPJ DUPLICADO
-        # ----------------------------------------------------
 
         if cnpj:
 
-            empresa_existente = Empresa.query.filter_by(
+            cnpj_existente = Empresa.query.filter_by(
                 cnpj=cnpj
             ).first()
 
-
-            if empresa_existente:
+            if cnpj_existente:
 
                 flash(
-                    "Já existe uma empresa cadastrada "
-                    "com este CNPJ.",
+                    "Já existe uma empresa cadastrada com este CNPJ.",
                     "danger"
                 )
 
                 return render_template(
-                    "empresa_form.html",
-                    titulo="Nova empresa",
-                    empresa=None
+                    "empresa_form.html"
                 )
 
-
-        # ----------------------------------------------------
-        # CRIA EMPRESA
-        # ----------------------------------------------------
-
         empresa = Empresa(
-
             razao_social=razao_social,
-
-            nome_fantasia=nome_fantasia,
-
+            nome_fantasia=nome_fantasia or None,
             cnpj=cnpj or None,
-
             telefone=telefone or None,
-
             email=email or None,
-
             endereco=endereco or None,
-
             ativo=True
         )
 
-
-        db.session.add(
-            empresa
-        )
-
+        db.session.add(empresa)
         db.session.commit()
 
-
         flash(
-            f'Empresa "{empresa.nome_fantasia}" '
-            "cadastrada com sucesso.",
+            "Empresa cadastrada com sucesso.",
             "success"
         )
-
 
         return redirect(
             url_for(
@@ -962,39 +874,36 @@ def admin_nova_empresa():
             )
         )
 
-
     return render_template(
-        "empresa_form.html",
-        titulo="Nova empresa",
-        empresa=None
+        "empresa_form.html"
     )
 
 
 # ============================================================
-# ADMIN - VISUALIZAR EMPRESA
+# DETALHES DA EMPRESA
 # ============================================================
 
 @app.route(
     "/admin/empresas/<int:empresa_id>"
 )
-@login_obrigatorio
+@admin_obrigatorio
 def admin_empresa_detalhes(empresa_id):
 
-    bloqueio = admin_obrigatorio()
-
-    if bloqueio:
-
-        return bloqueio
-
-
-    empresa = Empresa.query.get_or_404(
+    empresa = db.session.get(
+        Empresa,
         empresa_id
     )
 
+    if not empresa:
 
-    # --------------------------------------------------------
-    # USUÁRIOS DA EMPRESA
-    # --------------------------------------------------------
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
 
     usuarios = Usuario.query.filter_by(
         empresa_id=empresa.id
@@ -1002,44 +911,34 @@ def admin_empresa_detalhes(empresa_id):
         Usuario.nome.asc()
     ).all()
 
-
-    # --------------------------------------------------------
-    # ADMINISTRADORES DA EMPRESA
-    # --------------------------------------------------------
-
-    administradores = Usuario.query.filter_by(
-        empresa_id=empresa.id,
-        funcao="administrador_empresa"
-    ).order_by(
-        Usuario.nome.asc()
-    ).all()
-
-
-    # --------------------------------------------------------
-    # OBRAS DA EMPRESA
-    # --------------------------------------------------------
-
     obras = Obra.query.filter_by(
         empresa_id=empresa.id
     ).order_by(
-        Obra.criado_em.desc()
+        Obra.id.desc()
     ).all()
 
+    total_usuarios = len(usuarios)
 
-    # --------------------------------------------------------
-    # INDICADORES
-    # --------------------------------------------------------
+    usuarios_ativos = sum(
+        1 for usuario in usuarios
+        if usuario.ativo
+    )
 
-    total_usuarios = Usuario.query.filter_by(
-        empresa_id=empresa.id
-    ).count()
+    total_obras = len(obras)
 
+    obras_ativas = sum(
+        1 for obra in obras
+        if obra.status
+        and obra.status.lower()
+        not in [
+            "concluida",
+            "concluído",
+            "concluida",
+            "cancelada",
+        ]
+    )
 
-    total_obras = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).count()
-
-
+    # Solicitações relacionadas às obras da empresa
     total_solicitacoes = (
         Solicitacao.query
         .join(
@@ -1052,174 +951,136 @@ def admin_empresa_detalhes(empresa_id):
         .count()
     )
 
+    administradores_empresa = [
+        usuario
+        for usuario in usuarios
+        if usuario.funcao
+        and usuario.funcao.lower()
+        in [
+            "administrador_empresa",
+            "admin_empresa",
+        ]
+    ]
 
     return render_template(
         "empresa_detalhes.html",
-
         empresa=empresa,
-
         usuarios=usuarios,
-
-        administradores=administradores,
-
         obras=obras,
-
         total_usuarios=total_usuarios,
-
+        usuarios_ativos=usuarios_ativos,
         total_obras=total_obras,
-
-        total_solicitacoes=total_solicitacoes
+        obras_ativas=obras_ativas,
+        total_solicitacoes=total_solicitacoes,
+        administradores_empresa=administradores_empresa
     )
 
 
 # ============================================================
-# ADMIN - EDITAR EMPRESA
+# EDITAR EMPRESA
 # ============================================================
 
 @app.route(
     "/admin/empresas/<int:empresa_id>/editar",
     methods=["GET", "POST"]
 )
-@login_obrigatorio
+@admin_obrigatorio
 def admin_editar_empresa(empresa_id):
 
-    bloqueio = admin_obrigatorio()
-
-    if bloqueio:
-
-        return bloqueio
-
-
-    empresa = Empresa.query.get_or_404(
+    empresa = db.session.get(
+        Empresa,
         empresa_id
     )
 
+    if not empresa:
+
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
 
     if request.method == "POST":
 
-        razao_social = request.form.get(
-            "razao_social",
-            ""
+        razao_social = (
+            request.form.get("razao_social")
+            or ""
         ).strip()
 
-
-        nome_fantasia = request.form.get(
-            "nome_fantasia",
-            ""
+        nome_fantasia = (
+            request.form.get("nome_fantasia")
+            or ""
         ).strip()
 
-
-        cnpj = request.form.get(
-            "cnpj",
-            ""
+        cnpj = (
+            request.form.get("cnpj")
+            or ""
         ).strip()
 
-
-        telefone = request.form.get(
-            "telefone",
-            ""
+        telefone = (
+            request.form.get("telefone")
+            or ""
         ).strip()
 
-
-        email = request.form.get(
-            "email",
-            ""
+        email = (
+            request.form.get("email")
+            or ""
         ).strip()
 
-
-        endereco = request.form.get(
-            "endereco",
-            ""
+        endereco = (
+            request.form.get("endereco")
+            or ""
         ).strip()
-
-
-        # ----------------------------------------------------
-        # VALIDAÇÃO
-        # ----------------------------------------------------
 
         if not razao_social:
 
             flash(
-                "A razão social é obrigatória.",
-                "danger"
+                "Informe a razão social da empresa.",
+                "warning"
             )
 
             return render_template(
                 "empresa_form.html",
-                titulo="Editar empresa",
                 empresa=empresa
             )
 
-
-        if not nome_fantasia:
-
-            nome_fantasia = razao_social
-
-
-        # ----------------------------------------------------
-        # VERIFICA CNPJ
-        # ----------------------------------------------------
-
         if cnpj:
 
-            empresa_existente = Empresa.query.filter(
+            outra_empresa = Empresa.query.filter(
                 Empresa.cnpj == cnpj,
                 Empresa.id != empresa.id
             ).first()
 
-
-            if empresa_existente:
+            if outra_empresa:
 
                 flash(
-                    "Já existe outra empresa cadastrada "
-                    "com este CNPJ.",
+                    "Este CNPJ já está cadastrado em outra empresa.",
                     "danger"
                 )
 
                 return render_template(
                     "empresa_form.html",
-                    titulo="Editar empresa",
                     empresa=empresa
                 )
 
-
-        # ----------------------------------------------------
-        # ATUALIZA DADOS
-        # ----------------------------------------------------
-
         empresa.razao_social = razao_social
-
-        empresa.nome_fantasia = nome_fantasia
-
+        empresa.nome_fantasia = (
+            nome_fantasia or None
+        )
         empresa.cnpj = cnpj or None
-
         empresa.telefone = telefone or None
-
         empresa.email = email or None
-
         empresa.endereco = endereco or None
-
-
-        # ----------------------------------------------------
-        # STATUS
-        # ----------------------------------------------------
-
-        # Só altera o status se o campo estiver presente.
-        if "ativo" in request.form:
-
-            empresa.ativo = (
-                request.form.get("ativo") == "on"
-            )
-
 
         db.session.commit()
 
-
         flash(
-            "Dados da empresa atualizados com sucesso.",
+            "Empresa atualizada com sucesso.",
             "success"
         )
-
 
         return redirect(
             url_for(
@@ -1228,59 +1089,56 @@ def admin_editar_empresa(empresa_id):
             )
         )
 
-
     return render_template(
         "empresa_form.html",
-        titulo="Editar empresa",
         empresa=empresa
     )
 
 
 # ============================================================
-# ADMIN - ATIVAR / DESATIVAR EMPRESA
+# ATIVAR / DESATIVAR EMPRESA
 # ============================================================
 
 @app.route(
     "/admin/empresas/<int:empresa_id>/alternar-status",
     methods=["POST"]
 )
-@login_obrigatorio
-def admin_alternar_empresa(empresa_id):
+@admin_obrigatorio
+def admin_alternar_status_empresa(empresa_id):
 
-    bloqueio = admin_obrigatorio()
-
-    if bloqueio:
-
-        return bloqueio
-
-
-    empresa = Empresa.query.get_or_404(
+    empresa = db.session.get(
+        Empresa,
         empresa_id
     )
 
+    if not empresa:
+
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
 
     empresa.ativo = not empresa.ativo
 
-
     db.session.commit()
-
 
     if empresa.ativo:
 
         flash(
-            f'Empresa "{empresa.nome_fantasia}" '
-            "ativada com sucesso.",
+            f"A empresa {empresa.nome_fantasia or empresa.razao_social} foi ativada.",
             "success"
         )
 
     else:
 
         flash(
-            f'Empresa "{empresa.nome_fantasia}" '
-            "desativada com sucesso.",
+            f"A empresa {empresa.nome_fantasia or empresa.razao_social} foi desativada.",
             "warning"
         )
-
 
     return redirect(
         url_for(
@@ -1291,37 +1149,36 @@ def admin_alternar_empresa(empresa_id):
 
 
 # ============================================================
-# ADMIN - NOVO ADMINISTRADOR DA EMPRESA
+# NOVO ADMINISTRADOR DA EMPRESA
 # ============================================================
 
 @app.route(
-    "/admin/empresas/<int:empresa_id>/novo-administrador",
+    "/admin/empresas/<int:empresa_id>/usuarios/novo",
     methods=["GET", "POST"]
 )
-@login_obrigatorio
+@admin_obrigatorio
 def admin_novo_usuario_empresa(empresa_id):
 
-    bloqueio = admin_obrigatorio()
-
-    if bloqueio:
-
-        return bloqueio
-
-
-    empresa = Empresa.query.get_or_404(
+    empresa = db.session.get(
+        Empresa,
         empresa_id
     )
 
+    if not empresa:
 
-    # --------------------------------------------------------
-    # EMPRESA DESATIVADA
-    # --------------------------------------------------------
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
 
     if not empresa.ativo:
 
         flash(
-            "Não é possível criar um administrador "
-            "para uma empresa desativada.",
+            "Não é possível criar usuários em uma empresa inativa.",
             "warning"
         )
 
@@ -1332,60 +1189,45 @@ def admin_novo_usuario_empresa(empresa_id):
             )
         )
 
-
     if request.method == "POST":
 
-        nome = request.form.get(
-            "nome",
-            ""
+        nome = (
+            request.form.get("nome")
+            or ""
         ).strip()
 
+        usuario_digitado = (
+            request.form.get("usuario")
+            or ""
+        ).strip()
 
-        usuario_digitado = request.form.get(
-            "usuario",
-            ""
-        ).strip().lower()
-
-
-        senha = request.form.get(
-            "senha",
-            ""
+        senha = (
+            request.form.get("senha")
+            or ""
         )
 
-
-        confirmar_senha = request.form.get(
-            "confirmar_senha",
-            ""
+        confirmar_senha = (
+            request.form.get("confirmar_senha")
+            or ""
         )
-
-
-        # ----------------------------------------------------
-        # NOME
-        # ----------------------------------------------------
 
         if not nome:
 
             flash(
                 "Informe o nome do administrador.",
-                "danger"
+                "warning"
             )
 
             return render_template(
                 "usuario_empresa_form.html",
                 empresa=empresa
             )
-
-
-        # ----------------------------------------------------
-        # USUÁRIO
-        # ----------------------------------------------------
 
         if len(usuario_digitado) < 3:
 
             flash(
-                "O usuário precisa ter pelo menos "
-                "3 caracteres.",
-                "danger"
+                "O usuário deve ter pelo menos 3 caracteres.",
+                "warning"
             )
 
             return render_template(
@@ -1393,20 +1235,16 @@ def admin_novo_usuario_empresa(empresa_id):
                 empresa=empresa
             )
 
-
-        # ----------------------------------------------------
-        # USUÁRIO DUPLICADO
-        # ----------------------------------------------------
-
-        usuario_existente = Usuario.query.filter_by(
-            usuario=usuario_digitado
+        usuario_existente = Usuario.query.filter(
+            db.func.lower(
+                Usuario.usuario
+            ) == usuario_digitado.lower()
         ).first()
-
 
         if usuario_existente:
 
             flash(
-                "Esse nome de usuário já está sendo utilizado.",
+                "Este nome de usuário já está sendo utilizado.",
                 "danger"
             )
 
@@ -1414,25 +1252,18 @@ def admin_novo_usuario_empresa(empresa_id):
                 "usuario_empresa_form.html",
                 empresa=empresa
             )
-
-
-        # ----------------------------------------------------
-        # SENHA
-        # ----------------------------------------------------
 
         if len(senha) < 6:
 
             flash(
-                "A senha precisa ter pelo menos "
-                "6 caracteres.",
-                "danger"
+                "A senha deve possuir pelo menos 6 caracteres.",
+                "warning"
             )
 
             return render_template(
                 "usuario_empresa_form.html",
                 empresa=empresa
             )
-
 
         if senha != confirmar_senha:
 
@@ -1446,29 +1277,17 @@ def admin_novo_usuario_empresa(empresa_id):
                 empresa=empresa
             )
 
-
-        # ----------------------------------------------------
-        # CRIA ADMINISTRADOR
-        # ----------------------------------------------------
-
         novo_usuario = Usuario(
-
             nome=nome,
-
             usuario=usuario_digitado,
-
-            empresa_id=empresa.id,
-
             funcao="administrador_empresa",
-
-            ativo=True
+            ativo=True,
+            empresa_id=empresa.id
         )
-
 
         novo_usuario.definir_senha(
             senha
         )
-
 
         db.session.add(
             novo_usuario
@@ -1476,13 +1295,10 @@ def admin_novo_usuario_empresa(empresa_id):
 
         db.session.commit()
 
-
         flash(
-            f'Administrador "{nome}" criado com sucesso '
-            f'para {empresa.nome_fantasia}.',
+            f"Administrador {nome} criado com sucesso.",
             "success"
         )
-
 
         return redirect(
             url_for(
@@ -1491,7 +1307,6 @@ def admin_novo_usuario_empresa(empresa_id):
             )
         )
 
-
     return render_template(
         "usuario_empresa_form.html",
         empresa=empresa
@@ -1499,7 +1314,158 @@ def admin_novo_usuario_empresa(empresa_id):
 
 
 # ============================================================
-# DASHBOARD DA EMPRESA
+# ATIVAR / DESATIVAR USUÁRIO DA EMPRESA
+# ============================================================
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>/usuarios/<int:usuario_id>/alternar-status",
+    methods=["POST"]
+)
+@admin_obrigatorio
+def admin_alternar_status_usuario_empresa(
+    empresa_id,
+    usuario_id
+):
+
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
+    )
+
+    if not empresa:
+
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    usuario = db.session.get(
+        Usuario,
+        usuario_id
+    )
+
+    if not usuario:
+
+        flash(
+            "Usuário não encontrado.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+    # Garante que o usuário pertence à empresa
+    if usuario.empresa_id != empresa.id:
+
+        flash(
+            "Este usuário não pertence à empresa selecionada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+    # Nunca permitir manipulação do ADM global
+    if (
+        usuario.funcao
+        and usuario.funcao.lower() == "adm"
+    ):
+
+        flash(
+            "O administrador global não pode ser alterado por este painel.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "admin_empresa_detalhes",
+                empresa_id=empresa.id
+            )
+        )
+
+    # --------------------------------------------------------
+    # PROTEÇÃO DO ÚLTIMO ADMINISTRADOR DA EMPRESA
+    # --------------------------------------------------------
+
+    eh_admin_empresa_usuario = (
+        usuario.funcao
+        and usuario.funcao.lower()
+        in [
+            "administrador_empresa",
+            "admin_empresa",
+        ]
+    )
+
+    if usuario.ativo and eh_admin_empresa_usuario:
+
+        outros_admins_ativos = Usuario.query.filter(
+            Usuario.empresa_id == empresa.id,
+            Usuario.id != usuario.id,
+            Usuario.ativo.is_(True),
+            db.func.lower(
+                Usuario.funcao
+            ).in_(
+                [
+                    "administrador_empresa",
+                    "admin_empresa",
+                ]
+            )
+        ).count()
+
+        if outros_admins_ativos == 0:
+
+            flash(
+                "Não é possível desativar o último administrador ativo da empresa.",
+                "warning"
+            )
+
+            return redirect(
+                url_for(
+                    "admin_empresa_detalhes",
+                    empresa_id=empresa.id
+                )
+            )
+
+    usuario.ativo = not usuario.ativo
+
+    db.session.commit()
+
+    if usuario.ativo:
+
+        flash(
+            f"O usuário {usuario.nome} foi ativado.",
+            "success"
+        )
+
+    else:
+
+        flash(
+            f"O usuário {usuario.nome} foi desativado.",
+            "warning"
+        )
+
+    return redirect(
+        url_for(
+            "admin_empresa_detalhes",
+            empresa_id=empresa.id
+        )
+    )
+
+
+# ============================================================
+# DASHBOARD
 # ============================================================
 
 @app.route("/")
@@ -1508,73 +1474,59 @@ def dashboard():
 
     usuario = usuario_atual()
 
+    # --------------------------------------------------------
+    # ADMIN GLOBAL
+    # --------------------------------------------------------
 
-    # ADM utiliza o painel global.
     if eh_administrador():
 
         return redirect(
             url_for("admin_dashboard")
         )
 
+    empresa = empresa_usuario_atual()
 
     # --------------------------------------------------------
     # OBRAS DA EMPRESA
     # --------------------------------------------------------
 
-    obras_query = Obra.query
+    if empresa:
 
+        obras = Obra.query.filter_by(
+            empresa_id=empresa.id
+        ).order_by(
+            Obra.id.desc()
+        ).all()
 
-    if usuario.empresa_id:
+        total_obras = Obra.query.filter_by(
+            empresa_id=empresa.id
+        ).count()
 
-        obras_query = obras_query.filter_by(
-            empresa_id=usuario.empresa_id
+        obras_ativas = Obra.query.filter(
+            Obra.empresa_id == empresa.id,
+            ~db.func.lower(
+                Obra.status
+            ).in_(
+                [
+                    "concluida",
+                    "concluído",
+                    "concluida",
+                    "cancelada",
+                ]
+            )
+        ).count()
+
+        total_solicitacoes = (
+            Solicitacao.query
+            .join(
+                Obra,
+                Solicitacao.obra_id == Obra.id
+            )
+            .filter(
+                Obra.empresa_id == empresa.id
+            )
+            .count()
         )
-
-    else:
-
-        obras_query = obras_query.filter(
-            Obra.id == -1
-        )
-
-
-    obras = obras_query.all()
-
-
-    total_obras = len(
-        obras
-    )
-
-
-    obras_ativas = sum(
-        1
-        for obra in obras
-        if obra.status in (
-            "andamento",
-            "em andamento"
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # MATERIAIS
-    # --------------------------------------------------------
-
-    total_materiais = Material.query.filter_by(
-        ativo=True
-    ).count()
-
-
-    materiais_baixos = Material.query.filter(
-        Material.ativo.is_(True),
-        Material.estoque_atual <= Material.estoque_minimo
-    ).count()
-
-
-    # --------------------------------------------------------
-    # SOLICITAÇÕES PENDENTES
-    # --------------------------------------------------------
-
-    if usuario.empresa_id:
 
         solicitacoes_pendentes = (
             Solicitacao.query
@@ -1583,29 +1535,73 @@ def dashboard():
                 Solicitacao.obra_id == Obra.id
             )
             .filter(
-                Obra.empresa_id == usuario.empresa_id,
-                Solicitacao.status == "pendente"
+                Obra.empresa_id == empresa.id,
+                db.func.lower(
+                    Solicitacao.status
+                ) == "pendente"
             )
             .count()
         )
 
+        solicitacoes = (
+            Solicitacao.query
+            .join(
+                Obra,
+                Solicitacao.obra_id == Obra.id
+            )
+            .filter(
+                Obra.empresa_id == empresa.id
+            )
+            .order_by(
+                Solicitacao.id.desc()
+            )
+            .limit(10)
+            .all()
+        )
+
     else:
 
-        solicitacoes_pendentes = 0
+        obras = Obra.query.order_by(
+            Obra.id.desc()
+        ).all()
 
+        total_obras = Obra.query.count()
+
+        obras_ativas = Obra.query.filter(
+            ~db.func.lower(
+                Obra.status
+            ).in_(
+                [
+                    "concluida",
+                    "concluído",
+                    "concluida",
+                    "cancelada",
+                ]
+            )
+        ).count()
+
+        total_solicitacoes = Solicitacao.query.count()
+
+        solicitacoes_pendentes = Solicitacao.query.filter(
+            db.func.lower(
+                Solicitacao.status
+            ) == "pendente"
+        ).count()
+
+        solicitacoes = Solicitacao.query.order_by(
+            Solicitacao.id.desc()
+        ).limit(10).all()
 
     return render_template(
         "dashboard.html",
-
+        usuario=usuario,
+        empresa=empresa,
+        obras=obras,
         total_obras=total_obras,
-
         obras_ativas=obras_ativas,
-
-        total_materiais=total_materiais,
-
-        materiais_baixos=materiais_baixos,
-
-        solicitacoes_pendentes=solicitacoes_pendentes
+        total_solicitacoes=total_solicitacoes,
+        solicitacoes_pendentes=solicitacoes_pendentes,
+        solicitacoes=solicitacoes
     )
 
 
@@ -1617,47 +1613,27 @@ def dashboard():
 @login_obrigatorio
 def obras():
 
-    usuario = usuario_atual()
+    empresa = empresa_usuario_atual()
 
+    if empresa:
 
-    # ADM trabalha pelo painel administrativo.
-    if eh_administrador():
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-
-    query = Obra.query
-
-
-    if usuario.empresa_id:
-
-        query = query.filter_by(
-            empresa_id=usuario.empresa_id
-        )
+        lista_obras = Obra.query.filter_by(
+            empresa_id=empresa.id
+        ).order_by(
+            Obra.id.desc()
+        ).all()
 
     else:
 
-        query = query.filter(
-            Obra.id == -1
-        )
-
-
-    lista = query.order_by(
-        Obra.id.desc()
-    ).all()
-
+        lista_obras = Obra.query.order_by(
+            Obra.id.desc()
+        ).all()
 
     return render_template(
         "obras.html",
-        obras=lista
+        obras=lista_obras
     )
 
-
-# ============================================================
-# NOVA OBRA
-# ============================================================
 
 @app.route(
     "/obras/nova",
@@ -1666,34 +1642,12 @@ def obras():
 @login_obrigatorio
 def nova_obra():
 
-    usuario = usuario_atual()
+    empresa = empresa_usuario_atual()
 
-
-    # --------------------------------------------------------
-    # ADM
-    # --------------------------------------------------------
-
-    if eh_administrador():
+    if not empresa:
 
         flash(
-            "Selecione uma empresa pelo painel administrativo "
-            "para cadastrar uma obra.",
-            "info"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-
-    # --------------------------------------------------------
-    # USUÁRIO SEM EMPRESA
-    # --------------------------------------------------------
-
-    if not usuario.empresa_id:
-
-        flash(
-            "Seu usuário não está vinculado a uma empresa.",
+            "Não foi possível identificar a empresa.",
             "danger"
         )
 
@@ -1701,77 +1655,86 @@ def nova_obra():
             url_for("dashboard")
         )
 
-
     if request.method == "POST":
 
-        nome = request.form.get(
-            "nome",
-            ""
+        nome = (
+            request.form.get("nome")
+            or ""
         ).strip()
 
+        cliente = (
+            request.form.get("cliente")
+            or ""
+        ).strip()
+
+        responsavel = (
+            request.form.get("responsavel")
+            or ""
+        ).strip()
+
+        endereco = (
+            request.form.get("endereco")
+            or ""
+        ).strip()
+
+        data_inicio_str = (
+            request.form.get("data_inicio")
+            or ""
+        ).strip()
+
+        previsao_termino_str = (
+            request.form.get("previsao_termino")
+            or ""
+        ).strip()
+
+        status = (
+            request.form.get("status")
+            or "planejamento"
+        ).strip()
+
+        observacoes = (
+            request.form.get("observacoes")
+            or ""
+        ).strip()
 
         if not nome:
 
             flash(
                 "Informe o nome da obra.",
-                "danger"
+                "warning"
             )
 
-            return redirect(
-                url_for("nova_obra")
+            return render_template(
+                "obra_form.html"
             )
-
-
-        # ----------------------------------------------------
-        # DATAS
-        # ----------------------------------------------------
 
         data_inicio = None
-
         previsao_termino = None
-
-
-        data_inicio_texto = request.form.get(
-            "data_inicio",
-            ""
-        ).strip()
-
-
-        previsao_termino_texto = request.form.get(
-            "previsao_termino",
-            ""
-        ).strip()
-
 
         try:
 
-            if data_inicio_texto:
-
+            if data_inicio_str:
                 data_inicio = datetime.strptime(
-                    data_inicio_texto,
+                    data_inicio_str,
                     "%Y-%m-%d"
                 ).date()
 
-
-            if previsao_termino_texto:
-
+            if previsao_termino_str:
                 previsao_termino = datetime.strptime(
-                    previsao_termino_texto,
+                    previsao_termino_str,
                     "%Y-%m-%d"
                 ).date()
-
 
         except ValueError:
 
             flash(
-                "Uma das datas informadas é inválida.",
+                "Informe datas válidas.",
                 "danger"
             )
 
-            return redirect(
-                url_for("nova_obra")
+            return render_template(
+                "obra_form.html"
             )
-
 
         if (
             data_inicio
@@ -1780,52 +1743,25 @@ def nova_obra():
         ):
 
             flash(
-                "A previsão de término não pode ser anterior "
-                "à data de início.",
-                "danger"
+                "A previsão de término não pode ser anterior ao início da obra.",
+                "warning"
             )
 
-            return redirect(
-                url_for("nova_obra")
+            return render_template(
+                "obra_form.html"
             )
-
 
         obra = Obra(
-
-            empresa_id=usuario.empresa_id,
-
+            empresa_id=empresa.id,
             nome=nome,
-
-            cliente=request.form.get(
-                "cliente",
-                ""
-            ).strip(),
-
-            endereco=request.form.get(
-                "endereco",
-                ""
-            ).strip(),
-
-            responsavel=request.form.get(
-                "responsavel",
-                ""
-            ).strip(),
-
+            cliente=cliente or None,
+            responsavel=responsavel or None,
+            endereco=endereco or None,
             data_inicio=data_inicio,
-
             previsao_termino=previsao_termino,
-
-            status=request.form.get(
-                "status",
-                "planejamento"
-            ),
-
-            observacoes=request.form.get(
-                "observacoes",
-                ""
-            ).strip()
+            status=status or "planejamento",
+            observacoes=observacoes or None
         )
-
 
         db.session.add(
             obra
@@ -1833,21 +1769,17 @@ def nova_obra():
 
         db.session.commit()
 
-
         flash(
             "Obra cadastrada com sucesso.",
             "success"
         )
 
-
         return redirect(
             url_for("obras")
         )
 
-
     return render_template(
-        "obra_form.html",
-        obra=None
+        "obra_form.html"
     )
 
 
@@ -1859,26 +1791,18 @@ def nova_obra():
 @login_obrigatorio
 def materiais():
 
-    # O catálogo de materiais é global neste momento.
-    # Nenhum preço é armazenado.
-
-    lista = Material.query.filter_by(
+    lista_materiais = Material.query.filter_by(
         ativo=True
     ).order_by(
-        Material.categoria,
-        Material.nome
+        Material.categoria.asc(),
+        Material.nome.asc()
     ).all()
-
 
     return render_template(
         "materiais.html",
-        materiais=lista
+        materiais=lista_materiais
     )
 
-
-# ============================================================
-# NOVO MATERIAL
-# ============================================================
 
 @app.route(
     "/materiais/novo",
@@ -1887,116 +1811,116 @@ def materiais():
 @login_obrigatorio
 def novo_material():
 
-    # Cadastro global será posteriormente
-    # controlado pelo módulo administrativo.
-
-    if eh_administrador():
-
-        flash(
-            "O cadastro global de materiais será realizado "
-            "pelo módulo administrativo.",
-            "info"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-
     if request.method == "POST":
 
-        nome = request.form.get(
-            "nome",
-            ""
+        categoria = (
+            request.form.get("categoria")
+            or ""
         ).strip()
 
-
-        categoria = request.form.get(
-            "categoria",
-            ""
+        nome = (
+            request.form.get("nome")
+            or ""
         ).strip()
 
-
-        unidade = request.form.get(
-            "unidade",
-            ""
+        unidade = (
+            request.form.get("unidade")
+            or ""
         ).strip()
 
+        descricao = (
+            request.form.get("descricao")
+            or ""
+        ).strip()
 
-        if not nome or not categoria or not unidade:
+        estoque_minimo_str = (
+            request.form.get("estoque_minimo")
+            or "0"
+        ).strip()
+
+        estoque_atual_str = (
+            request.form.get("estoque_atual")
+            or "0"
+        ).strip()
+
+        ativo = request.form.get(
+            "ativo"
+        ) == "on"
+
+        if not categoria:
 
             flash(
-                "Preencha nome, categoria e unidade.",
-                "danger"
+                "Informe a categoria do material.",
+                "warning"
             )
 
-            return redirect(
-                url_for("novo_material")
+            return render_template(
+                "material_form.html"
             )
 
+        if not nome:
+
+            flash(
+                "Informe o nome do material.",
+                "warning"
+            )
+
+            return render_template(
+                "material_form.html"
+            )
+
+        if not unidade:
+
+            flash(
+                "Informe a unidade do material.",
+                "warning"
+            )
+
+            return render_template(
+                "material_form.html"
+            )
 
         try:
 
             estoque_minimo = float(
-                request.form.get(
-                    "estoque_minimo",
-                    0
-                ) or 0
+                estoque_minimo_str
             )
-
 
             estoque_atual = float(
-                request.form.get(
-                    "estoque_atual",
-                    0
-                ) or 0
+                estoque_atual_str
             )
-
 
         except ValueError:
 
             flash(
-                "Quantidade de estoque inválida.",
+                "Informe valores de estoque válidos.",
                 "danger"
             )
 
-            return redirect(
-                url_for("novo_material")
+            return render_template(
+                "material_form.html"
             )
-
 
         if estoque_minimo < 0 or estoque_atual < 0:
 
             flash(
                 "Os valores de estoque não podem ser negativos.",
-                "danger"
+                "warning"
             )
 
-            return redirect(
-                url_for("novo_material")
+            return render_template(
+                "material_form.html"
             )
-
 
         material = Material(
-
             categoria=categoria,
-
             nome=nome,
-
-            descricao=request.form.get(
-                "descricao",
-                ""
-            ).strip(),
-
             unidade=unidade,
-
+            descricao=descricao or None,
             estoque_minimo=estoque_minimo,
-
             estoque_atual=estoque_atual,
-
-            ativo=True
+            ativo=ativo
         )
-
 
         db.session.add(
             material
@@ -2004,17 +1928,14 @@ def novo_material():
 
         db.session.commit()
 
-
         flash(
             "Material cadastrado com sucesso.",
             "success"
         )
 
-
         return redirect(
             url_for("materiais")
         )
-
 
     return render_template(
         "material_form.html"
@@ -2029,50 +1950,36 @@ def novo_material():
 @login_obrigatorio
 def solicitacoes():
 
-    usuario = usuario_atual()
+    empresa = empresa_usuario_atual()
 
+    if empresa:
 
-    # ADM visualiza o painel global.
-    if eh_administrador():
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-
-    query = Solicitacao.query
-
-
-    if usuario.empresa_id:
-
-        query = query.join(
-            Obra,
-            Solicitacao.obra_id == Obra.id
-        ).filter(
-            Obra.empresa_id == usuario.empresa_id
+        lista_solicitacoes = (
+            Solicitacao.query
+            .join(
+                Obra,
+                Solicitacao.obra_id == Obra.id
+            )
+            .filter(
+                Obra.empresa_id == empresa.id
+            )
+            .order_by(
+                Solicitacao.id.desc()
+            )
+            .all()
         )
 
     else:
 
-        query = query.filter(
-            Solicitacao.id == -1
-        )
-
-
-    lista = query.order_by(
-        Solicitacao.id.desc()
-    ).all()
-
+        lista_solicitacoes = Solicitacao.query.order_by(
+            Solicitacao.id.desc()
+        ).all()
 
     return render_template(
         "solicitacoes.html",
-        solicitacoes=lista
+        solicitacoes=lista_solicitacoes
     )
 
-
-# ============================================================
-# NOVA SOLICITAÇÃO
-# ============================================================
 
 @app.route(
     "/solicitacoes/nova",
@@ -2081,26 +1988,12 @@ def solicitacoes():
 @login_obrigatorio
 def nova_solicitacao():
 
-    usuario = usuario_atual()
+    empresa = empresa_usuario_atual()
 
-
-    if eh_administrador():
-
-        flash(
-            "O ADM deve selecionar uma empresa antes "
-            "de criar uma solicitação.",
-            "info"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-
-    if not usuario.empresa_id:
+    if not empresa:
 
         flash(
-            "Seu usuário não está vinculado a uma empresa.",
+            "Não foi possível identificar a empresa.",
             "danger"
         )
 
@@ -2108,61 +2001,46 @@ def nova_solicitacao():
             url_for("dashboard")
         )
 
-
-    # --------------------------------------------------------
-    # OBRAS DA EMPRESA
-    # --------------------------------------------------------
-
-    obras = Obra.query.filter_by(
-        empresa_id=usuario.empresa_id
-    ).order_by(
-        Obra.nome
-    ).all()
-
-
-    # --------------------------------------------------------
-    # MATERIAIS ATIVOS
-    # --------------------------------------------------------
-
-    materiais = Material.query.filter_by(
-        ativo=True
-    ).order_by(
-        Material.nome
-    ).all()
-
-
     if request.method == "POST":
+
+        obra_id_str = (
+            request.form.get("obra_id")
+            or ""
+        ).strip()
+
+        material_id_str = (
+            request.form.get("material_id")
+            or ""
+        ).strip()
+
+        quantidade_str = (
+            request.form.get("quantidade")
+            or ""
+        ).strip()
+
+        observacao = (
+            request.form.get("observacao")
+            or ""
+        ).strip()
 
         try:
 
             obra_id = int(
-                request.form.get(
-                    "obra_id"
-                )
+                obra_id_str
             )
-
 
             material_id = int(
-                request.form.get(
-                    "material_id"
-                )
+                material_id_str
             )
-
 
             quantidade = float(
-                request.form.get(
-                    "quantidade"
-                )
+                quantidade_str
             )
 
-
-        except (
-            ValueError,
-            TypeError
-        ):
+        except ValueError:
 
             flash(
-                "Dados da solicitação inválidos.",
+                "Preencha corretamente os dados da solicitação.",
                 "danger"
             )
 
@@ -2170,49 +2048,42 @@ def nova_solicitacao():
                 url_for("nova_solicitacao")
             )
 
-
-        # ----------------------------------------------------
-        # VALIDA OBRA
-        # ----------------------------------------------------
-
-        obra = db.session.get(
-            Obra,
-            obra_id
-        )
-
-
-        if (
-            not obra
-            or obra.empresa_id != usuario.empresa_id
-        ):
+        if quantidade <= 0:
 
             flash(
-                "Obra inválida.",
-                "danger"
+                "A quantidade deve ser maior que zero.",
+                "warning"
             )
 
             return redirect(
                 url_for("nova_solicitacao")
             )
 
+        obra = Obra.query.filter_by(
+            id=obra_id,
+            empresa_id=empresa.id
+        ).first()
 
-        # ----------------------------------------------------
-        # VALIDA MATERIAL
-        # ----------------------------------------------------
+        if not obra:
+
+            flash(
+                "Obra inválida ou não pertence à sua empresa.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("nova_solicitacao")
+            )
 
         material = db.session.get(
             Material,
             material_id
         )
 
-
-        if (
-            not material
-            or not material.ativo
-        ):
+        if not material or not material.ativo:
 
             flash(
-                "Material inválido.",
+                "Material inválido ou inativo.",
                 "danger"
             )
 
@@ -2220,45 +2091,16 @@ def nova_solicitacao():
                 url_for("nova_solicitacao")
             )
 
-
-        # ----------------------------------------------------
-        # VALIDA QUANTIDADE
-        # ----------------------------------------------------
-
-        if quantidade <= 0:
-
-            flash(
-                "A quantidade deve ser maior que zero.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("nova_solicitacao")
-            )
-
-
-        # ----------------------------------------------------
-        # CRIA SOLICITAÇÃO
-        # ----------------------------------------------------
+        usuario = usuario_atual()
 
         solicitacao = Solicitacao(
-
             obra_id=obra.id,
-
             material_id=material.id,
-
             usuario_id=usuario.id,
-
             quantidade=quantidade,
-
-            observacao=request.form.get(
-                "observacao",
-                ""
-            ).strip(),
-
+            observacao=observacao or None,
             status="pendente"
         )
-
 
         db.session.add(
             solicitacao
@@ -2266,48 +2108,54 @@ def nova_solicitacao():
 
         db.session.commit()
 
-
         flash(
-            "Solicitação enviada com sucesso.",
+            "Solicitação de material enviada com sucesso.",
             "success"
         )
-
 
         return redirect(
             url_for("solicitacoes")
         )
 
+    obras_disponiveis = Obra.query.filter_by(
+        empresa_id=empresa.id
+    ).order_by(
+        Obra.nome.asc()
+    ).all()
+
+    materiais_disponiveis = Material.query.filter_by(
+        ativo=True
+    ).order_by(
+        Material.categoria.asc(),
+        Material.nome.asc()
+    ).all()
 
     return render_template(
         "solicitacao_form.html",
-        obras=obras,
-        materiais=materiais
+        obras=obras_disponiveis,
+        materiais=materiais_disponiveis
     )
 
 
 # ============================================================
-# ERRO 404
+# ERROS
 # ============================================================
 
 @app.errorhandler(404)
 def pagina_nao_encontrada(error):
 
     return render_template(
-        "404.html"
+        "base.html"
     ), 404
 
 
-# ============================================================
-# ERRO 500
-# ============================================================
-
 @app.errorhandler(500)
-def erro_interno(error):
+def erro_servidor(error):
 
     db.session.rollback()
 
     return render_template(
-        "500.html"
+        "base.html"
     ), 500
 
 
@@ -2315,26 +2163,18 @@ def erro_interno(error):
 # INICIALIZAÇÃO
 # ============================================================
 
-with app.app_context():
+inicializar_banco()
 
-    inicializar_banco()
-
-
-# ============================================================
-# EXECUÇÃO LOCAL
-# ============================================================
 
 if __name__ == "__main__":
 
-    port = int(
-        os.getenv(
-            "PORT",
-            5000
-        )
-    )
-
     app.run(
         host="0.0.0.0",
-        port=port,
+        port=int(
+            os.getenv(
+                "PORT",
+                5000
+            )
+        ),
         debug=False
     )
