@@ -1,18 +1,12 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
 
     <meta charset="UTF-8">
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <meta
-        name="description"
-        content="Construtora Pro - Gestão completa para empreiteiras e obras"
+        content="width=device-width, initial-scale=1"
     >
 
     <title>
@@ -21,19 +15,16 @@
         {% endblock %}
     </title>
 
-    <!-- Bootstrap -->
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
         rel="stylesheet"
     >
 
-    <!-- Bootstrap Icons -->
     <link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
     >
 
-    <!-- CSS principal -->
     <link
         rel="stylesheet"
         href="{{ url_for('static', filename='css/style.css') }}"
@@ -43,9 +34,7 @@
 
 </head>
 
-
-<body class="bg-light">
-
+<body>
 
 <!-- =========================================================
      NAVBAR
@@ -53,27 +42,22 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
 
-    <div class="container-fluid px-3 px-lg-4">
+    <div class="container-fluid">
 
         <!-- LOGO -->
         <a
-            class="navbar-brand d-flex align-items-center gap-2 fw-bold"
-            href="{% if eh_adm %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}"
+            class="navbar-brand fw-bold"
+            href="{% if current_user.is_authenticated %}{% if eh_administrador() %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('empresa_dashboard') }}{% endif %}{% else %}{{ url_for('login') }}{% endif %}"
         >
 
-            <span
-                class="d-flex align-items-center justify-content-center bg-primary rounded-3"
-                style="width: 38px; height: 38px;"
-            >
-                <i class="bi bi-buildings-fill"></i>
-            </span>
+            <i class="bi bi-building"></i>
 
-            <span>
-                Construtora Pro
-            </span>
+            Construtora Pro
 
         </a>
 
+
+        {% if current_user.is_authenticated %}
 
         <!-- BOTÃO MOBILE -->
 
@@ -92,28 +76,74 @@
         </button>
 
 
-        <!-- MENU -->
-
         <div
             class="collapse navbar-collapse"
             id="menuPrincipal"
         >
 
+            <!-- =================================================
+                 MENU DO ADM GERAL
+            ================================================== -->
+
+            {% if eh_administrador() %}
+
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-
-
-                <!-- DASHBOARD -->
 
                 <li class="nav-item">
 
                     <a
                         class="nav-link"
-                        href="{% if eh_adm %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}"
+                        href="{{ url_for('admin_dashboard') }}"
                     >
 
-                        <i class="bi bi-speedometer2 me-1"></i>
+                        <i class="bi bi-speedometer2"></i>
 
-                        Dashboard
+                        Painel Geral
+
+                    </a>
+
+                </li>
+
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('admin_empresas') }}"
+                    >
+
+                        <i class="bi bi-buildings"></i>
+
+                        Empreiteiras
+
+                    </a>
+
+                </li>
+
+            </ul>
+
+
+            <!-- =================================================
+                 MENU DA EMPRESA
+            ================================================== -->
+
+            {% else %}
+
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+
+                <!-- PAINEL DA EMPRESA -->
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('empresa_dashboard') }}"
+                    >
+
+                        <i class="bi bi-speedometer2"></i>
+
+                        Painel
 
                     </a>
 
@@ -129,7 +159,7 @@
                         href="{{ url_for('obras') }}"
                     >
 
-                        <i class="bi bi-building me-1"></i>
+                        <i class="bi bi-buildings"></i>
 
                         Obras
 
@@ -138,63 +168,12 @@
                 </li>
 
 
-                <!-- MATERIAIS -->
+                <!-- =================================================
+                     FUNCIONÁRIOS
+                     SOMENTE ADMIN DA EMPRESA
+                ================================================== -->
 
-                <li class="nav-item">
-
-                    <a
-                        class="nav-link"
-                        href="{{ url_for('materiais') }}"
-                    >
-
-                        <i class="bi bi-box-seam me-1"></i>
-
-                        Materiais
-
-                    </a>
-
-                </li>
-
-
-                <!-- FERRAMENTAS -->
-
-                <li class="nav-item">
-
-                    <a
-                        class="nav-link"
-                        href="{{ url_for('ferramentas') }}"
-                    >
-
-                        <i class="bi bi-tools me-1"></i>
-
-                        Ferramentas
-
-                    </a>
-
-                </li>
-
-
-                <!-- SOLICITAÇÕES -->
-
-                <li class="nav-item">
-
-                    <a
-                        class="nav-link position-relative"
-                        href="{{ url_for('solicitacoes') }}"
-                    >
-
-                        <i class="bi bi-clipboard-check me-1"></i>
-
-                        Solicitações
-
-                    </a>
-
-                </li>
-
-
-                <!-- FUNCIONÁRIOS -->
-
-                {% if eh_gestor %}
+                {% if eh_administrador_empresa() %}
 
                 <li class="nav-item">
 
@@ -203,7 +182,7 @@
                         href="{{ url_for('funcionarios') }}"
                     >
 
-                        <i class="bi bi-people-fill me-1"></i>
+                        <i class="bi bi-people"></i>
 
                         Funcionários
 
@@ -214,18 +193,120 @@
                 {% endif %}
 
 
-                <!-- ADMIN GERAL -->
+                <!-- =================================================
+                     ESTOQUE / MATERIAIS / FERRAMENTAS
+                ================================================== -->
 
-                {% if eh_adm %}
+                {% if eh_gestor() %}
 
                 <li class="nav-item">
 
                     <a
                         class="nav-link"
-                        href="{{ url_for('admin_dashboard') }}"
+                        href="{{ url_for('estoque') }}"
                     >
 
-                        <i class="bi bi-shield-lock-fill me-1"></i>
+                        <i class="bi bi-box-seam"></i>
+
+                        Estoque
+
+                    </a>
+
+                </li>
+
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('materiais') }}"
+                    >
+
+                        <i class="bi bi-boxes"></i>
+
+                        Materiais
+
+                    </a>
+
+                </li>
+
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('ferramentas') }}"
+                    >
+
+                        <i class="bi bi-tools"></i>
+
+                        Ferramentas
+
+                    </a>
+
+                </li>
+
+                {% endif %}
+
+
+                <!-- =================================================
+                     SOLICITAÇÕES
+                ================================================== -->
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('solicitacoes') }}"
+                    >
+
+                        <i class="bi bi-clipboard-check"></i>
+
+                        Solicitações
+
+                    </a>
+
+                </li>
+
+
+                <!-- =================================================
+                     COMPRAS
+                ================================================== -->
+
+                {% if eh_compras() %}
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('solicitacoes') }}"
+                    >
+
+                        <i class="bi bi-cart-check"></i>
+
+                        Compras
+
+                    </a>
+
+                </li>
+
+                {% endif %}
+
+
+                <!-- =================================================
+                     ADMINISTRAÇÃO DA EMPRESA
+                ================================================== -->
+
+                {% if eh_administrador_empresa() %}
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('empresa_administracao') }}"
+                    >
+
+                        <i class="bi bi-gear"></i>
 
                         Administração
 
@@ -237,203 +318,68 @@
 
             </ul>
 
-
-            <!-- ÁREA DIREITA -->
-
-            <div class="d-flex align-items-center gap-2">
+            {% endif %}
 
 
-                <!-- EMPRESA -->
+            <!-- =================================================
+                 USUÁRIO LOGADO
+            ================================================== -->
 
-                {% if empresa_atual %}
+            <ul class="navbar-nav ms-auto">
 
-                <span
-                    class="badge bg-secondary d-none d-xl-inline-flex align-items-center gap-1 px-3 py-2"
-                >
+                <li class="nav-item dropdown">
 
-                    <i class="bi bi-building"></i>
-
-                    {{ empresa_atual.nome_fantasia }}
-
-                </span>
-
-                {% elif eh_adm %}
-
-                <span
-                    class="badge bg-primary d-none d-xl-inline-flex align-items-center gap-1 px-3 py-2"
-                >
-
-                    <i class="bi bi-shield-check"></i>
-
-                    ADM Geral
-
-                </span>
-
-                {% endif %}
-
-
-                <!-- USUÁRIO -->
-
-                {% if usuario_logado.is_authenticated %}
-
-                <div class="dropdown">
-
-                    <button
-                        class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2"
-                        type="button"
+                    <a
+                        class="nav-link dropdown-toggle"
+                        href="#"
+                        role="button"
                         data-bs-toggle="dropdown"
                         aria-expanded="false"
                     >
 
-                        <span
-                            class="d-flex align-items-center justify-content-center rounded-circle bg-primary"
-                            style="width: 30px; height: 30px;"
-                        >
+                        <i class="bi bi-person-circle"></i>
 
-                            <i class="bi bi-person-fill"></i>
+                        {{ current_user.nome }}
 
-                        </span>
-
-                        <span class="d-none d-md-inline">
-
-                            {{ usuario_logado.nome }}
-
-                        </span>
-
-                    </button>
+                    </a>
 
 
-                    <ul
-                        class="dropdown-menu dropdown-menu-end shadow"
-                    >
+                    <ul class="dropdown-menu dropdown-menu-end">
+
+
+                        <!-- IDENTIFICAÇÃO -->
 
                         <li>
 
-                            <h6 class="dropdown-header">
+                            <span class="dropdown-item-text">
 
-                                {{ usuario_logado.nome }}
+                                <strong>
+                                    {{ current_user.nome }}
+                                </strong>
 
-                            </h6>
+                                <br>
 
-                        </li>
+                                <small class="text-muted">
 
+                                    {% if eh_administrador() %}
 
-                        <li>
+                                        Administrador Geral
 
-                            <span class="dropdown-item-text small text-muted">
+                                    {% elif eh_administrador_empresa() %}
 
-                                {% if usuario_logado.funcao == "adm" %}
+                                        Administrador da Empreiteira
 
-                                    Administrador Geral
+                                    {% else %}
 
-                                {% elif usuario_logado.funcao == "administrador_empresa" or usuario_logado.funcao == "admin_empresa" %}
+                                        {{ current_user.funcao|replace('_', ' ')|title }}
 
-                                    Administrador da Empreiteira
+                                    {% endif %}
 
-                                {% elif usuario_logado.funcao == "mestre_obra" %}
-
-                                    Mestre de Obra
-
-                                {% elif usuario_logado.funcao == "pedreiro" %}
-
-                                    Pedreiro
-
-                                {% elif usuario_logado.funcao == "ajudante" %}
-
-                                    Ajudante
-
-                                {% elif usuario_logado.funcao == "compras" %}
-
-                                    Compras
-
-                                {% elif usuario_logado.funcao == "almoxarife" %}
-
-                                    Almoxarife
-
-                                {% elif usuario_logado.funcao == "equipe_obra" %}
-
-                                    Equipe da Obra
-
-                                {% else %}
-
-                                    Funcionário
-
-                                {% endif %}
+                                </small>
 
                             </span>
 
                         </li>
-
-
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-
-
-                        <!-- MEUS ACESSOS -->
-
-                        {% if not eh_adm %}
-
-                        <li>
-
-                            <a
-                                class="dropdown-item"
-                                href="{{ url_for('obras') }}"
-                            >
-
-                                <i class="bi bi-building me-2"></i>
-
-                                Minhas obras
-
-                            </a>
-
-                        </li>
-
-                        {% endif %}
-
-
-                        <!-- FUNCIONÁRIOS -->
-
-                        {% if eh_gestor %}
-
-                        <li>
-
-                            <a
-                                class="dropdown-item"
-                                href="{{ url_for('funcionarios') }}"
-                            >
-
-                                <i class="bi bi-people me-2"></i>
-
-                                Funcionários
-
-                            </a>
-
-                        </li>
-
-                        {% endif %}
-
-
-                        <!-- ADMIN -->
-
-                        {% if eh_adm %}
-
-                        <li>
-
-                            <a
-                                class="dropdown-item"
-                                href="{{ url_for('admin_dashboard') }}"
-                            >
-
-                                <i class="bi bi-shield-lock me-2"></i>
-
-                                Administração
-
-                            </a>
-
-                        </li>
-
-                        {% endif %}
 
 
                         <li>
@@ -450,7 +396,7 @@
                                 href="{{ url_for('logout') }}"
                             >
 
-                                <i class="bi bi-box-arrow-right me-2"></i>
+                                <i class="bi bi-box-arrow-right"></i>
 
                                 Sair
 
@@ -460,228 +406,94 @@
 
                     </ul>
 
-                </div>
+                </li>
 
-                {% endif %}
-
-            </div>
+            </ul>
 
         </div>
+
+        {% endif %}
 
     </div>
 
 </nav>
 
 
-
 <!-- =========================================================
      CONTEÚDO PRINCIPAL
 ========================================================= -->
 
-<main class="min-vh-100">
+<main class="container-fluid py-4">
 
-    <!-- MENSAGENS FLASH -->
+    <!-- MENSAGENS -->
 
-    <div class="container-fluid px-3 px-lg-4 pt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
 
-        {% with messages = get_flashed_messages(
-            with_categories=true
-        ) %}
+        {% if messages %}
 
-            {% if messages %}
+            {% for category, message in messages %}
 
-                {% for category, message in messages %}
+            <div
+                class="alert alert-{{ category }} alert-dismissible fade show"
+                role="alert"
+            >
 
-                    <div
-                        class="alert
-                        {% if category == 'success' %}
-                            alert-success
-                        {% elif category == 'danger' %}
-                            alert-danger
-                        {% elif category == 'warning' %}
-                            alert-warning
-                        {% elif category == 'info' %}
-                            alert-info
-                        {% else %}
-                            alert-secondary
-                        {% endif %}
-                        alert-dismissible fade show shadow-sm"
-                        role="alert"
-                    >
+                {{ message }}
 
-                        <div class="d-flex align-items-start gap-2">
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Fechar"
+                ></button>
 
-                            {% if category == "success" %}
+            </div>
 
-                                <i class="bi bi-check-circle-fill mt-1"></i>
+            {% endfor %}
 
-                            {% elif category == "danger" %}
+        {% endif %}
 
-                                <i class="bi bi-exclamation-octagon-fill mt-1"></i>
-
-                            {% elif category == "warning" %}
-
-                                <i class="bi bi-exclamation-triangle-fill mt-1"></i>
-
-                            {% elif category == "info" %}
-
-                                <i class="bi bi-info-circle-fill mt-1"></i>
-
-                            {% else %}
-
-                                <i class="bi bi-info-circle mt-1"></i>
-
-                            {% endif %}
-
-                            <div>
-
-                                {{ message }}
-
-                            </div>
-
-                        </div>
+    {% endwith %}
 
 
-                        <button
-                            type="button"
-                            class="btn-close"
-                            data-bs-dismiss="alert"
-                            aria-label="Fechar"
-                        ></button>
-
-                    </div>
-
-                {% endfor %}
-
-            {% endif %}
-
-        {% endwith %}
-
-    </div>
-
-
-    <!-- BLOCO DAS PÁGINAS -->
-
-    {% block content %}
-
-    {% endblock %}
+    {% block content %}{% endblock %}
 
 </main>
-
 
 
 <!-- =========================================================
      RODAPÉ
 ========================================================= -->
 
-<footer class="bg-dark text-white mt-5">
+<footer class="border-top mt-5 py-4">
 
-    <div class="container-fluid px-3 px-lg-4 py-4">
+    <div class="container-fluid text-center text-muted">
 
-        <div class="row g-4 align-items-center">
+        <small>
 
+            Construtora Pro
 
-            <div class="col-md-6">
+            &copy;
 
-                <div class="d-flex align-items-center gap-2 mb-2">
+            {{ now().year if now is defined else 2026 }}
 
-                    <span
-                        class="d-flex align-items-center justify-content-center bg-primary rounded-3"
-                        style="width: 34px; height: 34px;"
-                    >
+            — Gestão de Empreiteiras
 
-                        <i class="bi bi-buildings-fill"></i>
-
-                    </span>
-
-                    <strong>
-                        Construtora Pro
-                    </strong>
-
-                </div>
-
-                <p class="text-white-50 small mb-0">
-
-                    Gestão profissional de obras,
-                    materiais, ferramentas,
-                    funcionários e solicitações.
-
-                </p>
-
-            </div>
-
-
-            <div class="col-md-6 text-md-end">
-
-                {% if empresa_atual %}
-
-                    <div class="small text-white-50">
-
-                        Empresa
-
-                    </div>
-
-                    <div class="fw-semibold">
-
-                        {{ empresa_atual.nome_fantasia }}
-
-                    </div>
-
-                {% else %}
-
-                    <div class="small text-white-50">
-
-                        Sistema de gestão
-
-                    </div>
-
-                    <div class="fw-semibold">
-
-                        Construtora Pro
-
-                    </div>
-
-                {% endif %}
-
-            </div>
-
-        </div>
-
-
-        <hr class="border-secondary my-4">
-
-
-        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
-
-            <span class="small text-white-50">
-
-                © {{ now().year if now is defined else "" }}
-                Construtora Pro
-
-            </span>
-
-            <span class="small text-white-50">
-
-                Sistema de gestão de empreiteiras
-
-            </span>
-
-        </div>
+        </small>
 
     </div>
 
 </footer>
 
 
-
-<!-- Bootstrap JS -->
+<!-- =========================================================
+     BOOTSTRAP
+========================================================= -->
 
 <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
 ></script>
 
-
-<!-- JS principal -->
 
 <script
     src="{{ url_for('static', filename='js/app.js') }}"
@@ -690,7 +502,5 @@
 
 {% block scripts %}{% endblock %}
 
-
 </body>
-
 </html>
