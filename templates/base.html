@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -10,7 +12,7 @@
 
     <meta
         name="description"
-        content="Construtora Pro - Gestão profissional para construtoras e empreiteiras"
+        content="Construtora Pro - Gestão completa para empreiteiras e obras"
     >
 
     <title>
@@ -19,7 +21,7 @@
         {% endblock %}
     </title>
 
-    <!-- Bootstrap 5 -->
+    <!-- Bootstrap -->
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
         rel="stylesheet"
@@ -27,912 +29,668 @@
 
     <!-- Bootstrap Icons -->
     <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
         rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
     >
 
-    <!-- CSS do sistema -->
+    <!-- CSS principal -->
     <link
         rel="stylesheet"
         href="{{ url_for('static', filename='css/style.css') }}"
     >
 
-    <style>
-        /* =========================================================
-           CONSTRUTORA PRO
-           BASE GLOBAL
-        ========================================================= */
+    {% block head %}{% endblock %}
 
-        :root {
-            --cp-primary: #0d6efd;
-            --cp-primary-dark: #0a58ca;
-            --cp-dark: #111827;
-            --cp-dark-2: #1f2937;
-            --cp-bg: #f4f6f9;
-            --cp-card: #ffffff;
-            --cp-border: #e5e7eb;
-            --cp-text: #1f2937;
-            --cp-muted: #6b7280;
-            --cp-success: #198754;
-            --cp-warning: #ffc107;
-            --cp-danger: #dc3545;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html {
-            min-height: 100%;
-            scroll-behavior: smooth;
-        }
-
-        body {
-            min-height: 100vh;
-            margin: 0;
-            background: var(--cp-bg);
-            color: var(--cp-text);
-            font-family:
-                Inter,
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
-            overflow-x: hidden;
-        }
-
-        a {
-            text-decoration: none;
-        }
-
-        /* =========================================================
-           NAVBAR
-        ========================================================= */
-
-        .cp-navbar {
-            background: var(--cp-dark);
-            min-height: 68px;
-            border-bottom: 1px solid rgba(255,255,255,.08);
-            box-shadow: 0 2px 12px rgba(0,0,0,.10);
-        }
-
-        .cp-navbar .navbar-brand {
-            color: #fff;
-            font-weight: 800;
-            font-size: 1.15rem;
-            letter-spacing: -.2px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            white-space: nowrap;
-        }
-
-        .cp-brand-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--cp-primary);
-            color: #fff;
-            font-size: 1.15rem;
-            flex-shrink: 0;
-        }
-
-        .cp-navbar .navbar-toggler {
-            border-color: rgba(255,255,255,.20);
-            box-shadow: none;
-        }
-
-        .cp-navbar .navbar-toggler:focus {
-            box-shadow: 0 0 0 .2rem rgba(13,110,253,.20);
-        }
-
-        .cp-navbar .navbar-toggler-icon {
-            filter: brightness(0) invert(1);
-        }
-
-        .cp-navbar .nav-link {
-            color: rgba(255,255,255,.76);
-            font-weight: 500;
-            padding: .65rem .85rem;
-            border-radius: 8px;
-            transition:
-                background .15s ease,
-                color .15s ease;
-        }
-
-        .cp-navbar .nav-link:hover {
-            color: #fff;
-            background: rgba(255,255,255,.08);
-        }
-
-        .cp-navbar .nav-link.active {
-            color: #fff;
-            background: rgba(13,110,253,.25);
-        }
-
-        .cp-navbar .nav-link i {
-            margin-right: 5px;
-        }
-
-        /* =========================================================
-           EMPRESA / USUÁRIO
-        ========================================================= */
-
-        .cp-company-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            max-width: 240px;
-            padding: 7px 11px;
-            border: 1px solid rgba(255,255,255,.12);
-            border-radius: 8px;
-            color: rgba(255,255,255,.80);
-            background: rgba(255,255,255,.05);
-            font-size: .82rem;
-        }
-
-        .cp-company-badge span {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .cp-user-button {
-            border: 1px solid rgba(255,255,255,.15);
-            color: #fff;
-            background: rgba(255,255,255,.06);
-            border-radius: 9px;
-            padding: 7px 11px;
-        }
-
-        .cp-user-button:hover,
-        .cp-user-button:focus {
-            color: #fff;
-            background: rgba(255,255,255,.12);
-            border-color: rgba(255,255,255,.20);
-        }
-
-        .cp-user-avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: var(--cp-primary);
-            color: #fff;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: .85rem;
-        }
-
-        .dropdown-menu {
-            border: 1px solid var(--cp-border);
-            border-radius: 12px;
-            box-shadow: 0 12px 35px rgba(0,0,0,.12);
-            padding: 7px;
-        }
-
-        .dropdown-item {
-            border-radius: 8px;
-            padding: 9px 11px;
-        }
-
-        .dropdown-item:hover {
-            background: #f3f4f6;
-        }
-
-        /* =========================================================
-           ÁREA PRINCIPAL
-        ========================================================= */
-
-        .cp-main {
-            width: 100%;
-            min-height: calc(100vh - 68px);
-            padding: 28px 0 40px;
-        }
-
-        .cp-content {
-            width: 100%;
-            max-width: 1600px;
-            margin: 0 auto;
-            padding-left: 24px;
-            padding-right: 24px;
-        }
-
-        /* Garante que colunas não estourem a tela */
-        .cp-content .row > * {
-            min-width: 0;
-        }
-
-        /* =========================================================
-           CARDS
-        ========================================================= */
-
-        .card {
-            border-color: var(--cp-border);
-            border-radius: 14px;
-            box-shadow: 0 3px 14px rgba(15,23,42,.05);
-        }
-
-        .card-header {
-            background: #fff;
-            border-bottom-color: var(--cp-border);
-        }
-
-        .cp-card {
-            background: var(--cp-card);
-            border: 1px solid var(--cp-border);
-            border-radius: 14px;
-            box-shadow: 0 3px 14px rgba(15,23,42,.05);
-        }
-
-        .cp-card-header {
-            padding: 18px 20px;
-            border-bottom: 1px solid var(--cp-border);
-        }
-
-        .cp-card-body {
-            padding: 20px;
-        }
-
-        /* =========================================================
-           TÍTULOS DE PÁGINA
-        ========================================================= */
-
-        .cp-page-header {
-            margin-bottom: 24px;
-        }
-
-        .cp-page-header h1,
-        .cp-page-header h2,
-        .cp-page-header h3 {
-            color: var(--cp-dark);
-            margin-bottom: 4px;
-            font-weight: 750;
-            letter-spacing: -.4px;
-        }
-
-        .cp-page-header p {
-            margin-bottom: 0;
-            color: var(--cp-muted);
-        }
-
-        .cp-eyebrow {
-            color: var(--cp-primary);
-            font-size: .78rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            margin-bottom: 5px;
-        }
-
-        /* =========================================================
-           FORMULÁRIOS
-        ========================================================= */
-
-        .form-label {
-            color: #374151;
-            margin-bottom: 7px;
-        }
-
-        .form-control,
-        .form-select {
-            min-height: 44px;
-            border-color: #d7dce2;
-            border-radius: 9px;
-        }
-
-        textarea.form-control {
-            min-height: 100px;
-        }
-
-        .form-control:focus,
-        .form-select:focus {
-            border-color: var(--cp-primary);
-            box-shadow: 0 0 0 .2rem rgba(13,110,253,.12);
-        }
-
-        .form-text {
-            color: var(--cp-muted);
-        }
-
-        .form-check-input {
-            cursor: pointer;
-        }
-
-        /* =========================================================
-           BOTÕES
-        ========================================================= */
-
-        .btn {
-            border-radius: 9px;
-            font-weight: 600;
-        }
-
-        .btn-primary {
-            box-shadow: 0 3px 8px rgba(13,110,253,.15);
-        }
-
-        .btn-primary:hover {
-            background-color: var(--cp-primary-dark);
-        }
-
-        /* =========================================================
-           TABELAS
-        ========================================================= */
-
-        .table-responsive {
-            border-radius: 10px;
-        }
-
-        .table {
-            margin-bottom: 0;
-        }
-
-        .table thead th {
-            background: #f8fafc;
-            color: #4b5563;
-            font-size: .82rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .025em;
-            white-space: nowrap;
-            border-bottom: 1px solid var(--cp-border);
-        }
-
-        .table tbody td {
-            vertical-align: middle;
-        }
-
-        /* =========================================================
-           BADGES
-        ========================================================= */
-
-        .badge {
-            font-weight: 600;
-            border-radius: 7px;
-            padding: .45em .65em;
-        }
-
-        /* =========================================================
-           ALERTAS
-        ========================================================= */
-
-        .cp-flash-container {
-            width: 100%;
-            max-width: 1600px;
-            margin: 0 auto;
-            padding: 18px 24px 0;
-        }
-
-        .cp-flash-container .alert {
-            border-radius: 10px;
-            border-width: 1px;
-        }
-
-        /* =========================================================
-           ESTADO VAZIO
-        ========================================================= */
-
-        .cp-empty {
-            text-align: center;
-            padding: 45px 20px;
-            color: var(--cp-muted);
-        }
-
-        .cp-empty-icon {
-            width: 58px;
-            height: 58px;
-            margin: 0 auto 14px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #eef2f7;
-            color: #6b7280;
-            font-size: 1.5rem;
-        }
-
-        /* =========================================================
-           PÁGINA DE ERRO
-        ========================================================= */
-
-        .cp-error-page {
-            min-height: 55vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 40px 20px;
-        }
-
-        .cp-error-code {
-            font-size: clamp(4rem, 12vw, 8rem);
-            line-height: 1;
-            font-weight: 800;
-            color: var(--cp-primary);
-            letter-spacing: -5px;
-        }
-
-        .cp-error-page h1 {
-            color: var(--cp-dark);
-            font-weight: 750;
-        }
-
-        .cp-error-page p {
-            color: var(--cp-muted);
-            max-width: 620px;
-            margin: 0 auto 22px;
-        }
-
-        /* =========================================================
-           FOOTER
-        ========================================================= */
-
-        .cp-footer {
-            width: 100%;
-            border-top: 1px solid var(--cp-border);
-            background: #fff;
-            color: var(--cp-muted);
-            padding: 18px 24px;
-            font-size: .85rem;
-        }
-
-        .cp-footer-inner {
-            width: 100%;
-            max-width: 1600px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-        }
-
-        /* =========================================================
-           RESPONSIVIDADE
-        ========================================================= */
-
-        @media (max-width: 991.98px) {
-
-            .cp-navbar .navbar-collapse {
-                margin-top: 10px;
-                padding: 10px;
-                background: rgba(0,0,0,.12);
-                border-radius: 10px;
-            }
-
-            .cp-navbar .nav-link {
-                margin-bottom: 3px;
-            }
-
-            .cp-company-badge {
-                max-width: 100%;
-                margin-top: 8px;
-                margin-bottom: 8px;
-            }
-
-            .cp-user-area {
-                padding-top: 8px;
-                border-top: 1px solid rgba(255,255,255,.10);
-                margin-top: 8px;
-            }
-        }
-
-        @media (max-width: 767.98px) {
-
-            .cp-main {
-                padding-top: 20px;
-            }
-
-            .cp-content {
-                padding-left: 14px;
-                padding-right: 14px;
-            }
-
-            .cp-flash-container {
-                padding-left: 14px;
-                padding-right: 14px;
-            }
-
-            .cp-page-header {
-                margin-bottom: 18px;
-            }
-
-            .cp-page-header h1 {
-                font-size: 1.55rem;
-            }
-
-            .cp-page-header h2 {
-                font-size: 1.4rem;
-            }
-
-            .cp-card-body,
-            .card-body {
-                padding: 16px;
-            }
-
-            .cp-card-header,
-            .card-header {
-                padding: 15px 16px;
-            }
-
-            .cp-footer {
-                padding: 16px 14px;
-            }
-
-            .cp-footer-inner {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .table-responsive {
-                border: 1px solid var(--cp-border);
-            }
-        }
-
-        @media (max-width: 575.98px) {
-
-            .cp-navbar {
-                min-height: 62px;
-            }
-
-            .cp-brand-icon {
-                width: 34px;
-                height: 34px;
-            }
-
-            .cp-navbar .navbar-brand {
-                font-size: 1rem;
-            }
-
-            .cp-main {
-                min-height: calc(100vh - 62px);
-            }
-
-            .btn {
-                min-height: 42px;
-            }
-
-            .cp-error-code {
-                letter-spacing: -3px;
-            }
-        }
-    </style>
-
-    {% block head %}
-    {% endblock %}
 </head>
 
-<body>
 
-    <!-- =========================================================
-         NAVBAR PRINCIPAL
-    ========================================================== -->
-    <nav class="navbar navbar-expand-lg cp-navbar">
-        <div class="container-fluid px-3 px-lg-4">
+<body class="bg-light">
 
-            <!-- Marca -->
-            <a
-                class="navbar-brand"
-                href="{% if usuario_eh_admin %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}"
+
+<!-- =========================================================
+     NAVBAR
+========================================================= -->
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+
+    <div class="container-fluid px-3 px-lg-4">
+
+        <!-- LOGO -->
+        <a
+            class="navbar-brand d-flex align-items-center gap-2 fw-bold"
+            href="{% if eh_adm %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}"
+        >
+
+            <span
+                class="d-flex align-items-center justify-content-center bg-primary rounded-3"
+                style="width: 38px; height: 38px;"
             >
-                <span class="cp-brand-icon">
-                    <i class="bi bi-buildings"></i>
-                </span>
+                <i class="bi bi-buildings-fill"></i>
+            </span>
 
-                <span>Construtora Pro</span>
-            </a>
+            <span>
+                Construtora Pro
+            </span>
 
-            <!-- Botão mobile -->
-            <button
-                class="navbar-toggler"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#cpNavbar"
-                aria-controls="cpNavbar"
-                aria-expanded="false"
-                aria-label="Abrir menu"
-            >
-                <span class="navbar-toggler-icon"></span>
-            </button>
+        </a>
 
-            <!-- Menu -->
-            <div
-                class="collapse navbar-collapse"
-                id="cpNavbar"
-            >
 
-                <!-- Links principais -->
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <!-- BOTÃO MOBILE -->
 
-                    <!-- Dashboard -->
-                    <li class="nav-item">
-                        <a
-                            class="nav-link {% if request.endpoint in ['dashboard', 'admin_dashboard'] %}active{% endif %}"
-                            href="{% if usuario_eh_admin %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}"
-                        >
-                            <i class="bi bi-grid-1x2"></i>
-                            Dashboard
-                        </a>
-                    </li>
+        <button
+            class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#menuPrincipal"
+            aria-controls="menuPrincipal"
+            aria-expanded="false"
+            aria-label="Abrir menu"
+        >
 
-                    <!-- Obras -->
-                    <li class="nav-item">
-                        <a
-                            class="nav-link {% if request.endpoint in ['obras', 'nova_obra'] %}active{% endif %}"
-                            href="{{ url_for('obras') }}"
-                        >
-                            <i class="bi bi-houses"></i>
-                            Obras
-                        </a>
-                    </li>
+            <span class="navbar-toggler-icon"></span>
 
-                    <!-- Materiais -->
-                    <li class="nav-item">
-                        <a
-                            class="nav-link {% if request.endpoint in ['materiais', 'novo_material'] %}active{% endif %}"
-                            href="{{ url_for('materiais') }}"
-                        >
-                            <i class="bi bi-box-seam"></i>
-                            Materiais
-                        </a>
-                    </li>
+        </button>
 
-                    <!-- Solicitações -->
-                    <li class="nav-item">
-                        <a
-                            class="nav-link {% if request.endpoint in ['solicitacoes', 'nova_solicitacao'] %}active{% endif %}"
-                            href="{{ url_for('solicitacoes') }}"
-                        >
-                            <i class="bi bi-clipboard-check"></i>
-                            Solicitações
-                        </a>
-                    </li>
 
-                    <!-- Administração -->
-                    {% if usuario_eh_admin %}
-                    <li class="nav-item">
-                        <a
-                            class="nav-link {% if request.endpoint in ['admin_dashboard', 'admin_nova_empresa', 'admin_empresa_detalhes', 'admin_editar_empresa', 'admin_novo_usuario_empresa'] %}active{% endif %}"
-                            href="{{ url_for('admin_dashboard') }}"
-                        >
-                            <i class="bi bi-shield-lock"></i>
-                            Administração
-                        </a>
-                    </li>
-                    {% endif %}
+        <!-- MENU -->
 
-                </ul>
+        <div
+            class="collapse navbar-collapse"
+            id="menuPrincipal"
+        >
 
-                <!-- Área direita -->
-                {% if usuario_logado %}
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 
-                <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 cp-user-area">
 
-                    <!-- Empresa -->
-                    {% if empresa_usuario_logado %}
-                    <div
-                        class="cp-company-badge"
-                        title="{{ empresa_usuario_logado.nome_fantasia or empresa_usuario_logado.razao_social }}"
+                <!-- DASHBOARD -->
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{% if eh_adm %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}"
                     >
-                        <i class="bi bi-building"></i>
 
-                        <span>
-                            {{ empresa_usuario_logado.nome_fantasia or empresa_usuario_logado.razao_social }}
-                        </span>
-                    </div>
-                    {% endif %}
+                        <i class="bi bi-speedometer2 me-1"></i>
 
-                    <!-- Usuário -->
-                    <div class="dropdown">
+                        Dashboard
 
-                        <button
-                            class="btn cp-user-button dropdown-toggle d-flex align-items-center gap-2"
-                            type="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                        >
+                    </a>
 
-                            <span class="cp-user-avatar">
-                                <i class="bi bi-person"></i>
-                            </span>
+                </li>
 
-                            <span class="d-none d-sm-inline">
-                                {{ usuario_logado.nome }}
-                            </span>
 
-                        </button>
+                <!-- OBRAS -->
 
-                        <ul class="dropdown-menu dropdown-menu-end mt-2">
+                <li class="nav-item">
 
-                            <li>
-                                <div class="px-3 py-2">
-                                    <div class="fw-semibold">
-                                        {{ usuario_logado.nome }}
-                                    </div>
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('obras') }}"
+                    >
 
-                                    <div class="small text-muted">
-                                        @{{ usuario_logado.usuario }}
-                                    </div>
+                        <i class="bi bi-building me-1"></i>
 
-                                    <div class="small text-muted mt-1">
-                                        {{ usuario_logado.funcao }}
-                                    </div>
-                                </div>
-                            </li>
+                        Obras
 
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
+                    </a>
 
-                            <li>
-                                <a
-                                    class="dropdown-item text-danger"
-                                    href="{{ url_for('logout') }}"
-                                >
-                                    <i class="bi bi-box-arrow-right me-2"></i>
-                                    Sair
-                                </a>
-                            </li>
+                </li>
 
-                        </ul>
 
-                    </div>
+                <!-- MATERIAIS -->
 
-                </div>
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('materiais') }}"
+                    >
+
+                        <i class="bi bi-box-seam me-1"></i>
+
+                        Materiais
+
+                    </a>
+
+                </li>
+
+
+                <!-- FERRAMENTAS -->
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('ferramentas') }}"
+                    >
+
+                        <i class="bi bi-tools me-1"></i>
+
+                        Ferramentas
+
+                    </a>
+
+                </li>
+
+
+                <!-- SOLICITAÇÕES -->
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link position-relative"
+                        href="{{ url_for('solicitacoes') }}"
+                    >
+
+                        <i class="bi bi-clipboard-check me-1"></i>
+
+                        Solicitações
+
+                    </a>
+
+                </li>
+
+
+                <!-- FUNCIONÁRIOS -->
+
+                {% if eh_gestor %}
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('funcionarios') }}"
+                    >
+
+                        <i class="bi bi-people-fill me-1"></i>
+
+                        Funcionários
+
+                    </a>
+
+                </li>
 
                 {% endif %}
 
-            </div>
-        </div>
-    </nav>
 
+                <!-- ADMIN GERAL -->
 
-    <!-- =========================================================
-         MENSAGENS FLASH
-    ========================================================== -->
-    {% with mensagens = get_flashed_messages(with_categories=true) %}
+                {% if eh_adm %}
 
-        {% if mensagens %}
+                <li class="nav-item">
 
-        <div class="cp-flash-container">
+                    <a
+                        class="nav-link"
+                        href="{{ url_for('admin_dashboard') }}"
+                    >
 
-            {% for categoria, mensagem in mensagens %}
+                        <i class="bi bi-shield-lock-fill me-1"></i>
 
-                {% set classe_alerta = categoria %}
+                        Administração
 
-                {% if categoria == 'message' %}
-                    {% set classe_alerta = 'info' %}
+                    </a>
+
+                </li>
+
                 {% endif %}
 
-                <div
-                    class="alert alert-{{ classe_alerta }} alert-dismissible fade show d-flex align-items-start gap-2"
-                    role="alert"
+            </ul>
+
+
+            <!-- ÁREA DIREITA -->
+
+            <div class="d-flex align-items-center gap-2">
+
+
+                <!-- EMPRESA -->
+
+                {% if empresa_atual %}
+
+                <span
+                    class="badge bg-secondary d-none d-xl-inline-flex align-items-center gap-1 px-3 py-2"
                 >
 
-                    {% if classe_alerta == 'success' %}
-                        <i class="bi bi-check-circle-fill mt-1"></i>
+                    <i class="bi bi-building"></i>
 
-                    {% elif classe_alerta == 'danger' %}
-                        <i class="bi bi-exclamation-octagon-fill mt-1"></i>
+                    {{ empresa_atual.nome_fantasia }}
 
-                    {% elif classe_alerta == 'warning' %}
-                        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                </span>
 
-                    {% else %}
-                        <i class="bi bi-info-circle-fill mt-1"></i>
-                    {% endif %}
+                {% elif eh_adm %}
 
-                    <div class="flex-grow-1">
-                        {{ mensagem }}
-                    </div>
+                <span
+                    class="badge bg-primary d-none d-xl-inline-flex align-items-center gap-1 px-3 py-2"
+                >
+
+                    <i class="bi bi-shield-check"></i>
+
+                    ADM Geral
+
+                </span>
+
+                {% endif %}
+
+
+                <!-- USUÁRIO -->
+
+                {% if usuario_logado.is_authenticated %}
+
+                <div class="dropdown">
 
                     <button
+                        class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2"
                         type="button"
-                        class="btn-close"
-                        data-bs-dismiss="alert"
-                        aria-label="Fechar"
-                    ></button>
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                    >
+
+                        <span
+                            class="d-flex align-items-center justify-content-center rounded-circle bg-primary"
+                            style="width: 30px; height: 30px;"
+                        >
+
+                            <i class="bi bi-person-fill"></i>
+
+                        </span>
+
+                        <span class="d-none d-md-inline">
+
+                            {{ usuario_logado.nome }}
+
+                        </span>
+
+                    </button>
+
+
+                    <ul
+                        class="dropdown-menu dropdown-menu-end shadow"
+                    >
+
+                        <li>
+
+                            <h6 class="dropdown-header">
+
+                                {{ usuario_logado.nome }}
+
+                            </h6>
+
+                        </li>
+
+
+                        <li>
+
+                            <span class="dropdown-item-text small text-muted">
+
+                                {% if usuario_logado.funcao == "adm" %}
+
+                                    Administrador Geral
+
+                                {% elif usuario_logado.funcao == "administrador_empresa" or usuario_logado.funcao == "admin_empresa" %}
+
+                                    Administrador da Empreiteira
+
+                                {% elif usuario_logado.funcao == "mestre_obra" %}
+
+                                    Mestre de Obra
+
+                                {% elif usuario_logado.funcao == "pedreiro" %}
+
+                                    Pedreiro
+
+                                {% elif usuario_logado.funcao == "ajudante" %}
+
+                                    Ajudante
+
+                                {% elif usuario_logado.funcao == "compras" %}
+
+                                    Compras
+
+                                {% elif usuario_logado.funcao == "almoxarife" %}
+
+                                    Almoxarife
+
+                                {% elif usuario_logado.funcao == "equipe_obra" %}
+
+                                    Equipe da Obra
+
+                                {% else %}
+
+                                    Funcionário
+
+                                {% endif %}
+
+                            </span>
+
+                        </li>
+
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+
+                        <!-- MEUS ACESSOS -->
+
+                        {% if not eh_adm %}
+
+                        <li>
+
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('obras') }}"
+                            >
+
+                                <i class="bi bi-building me-2"></i>
+
+                                Minhas obras
+
+                            </a>
+
+                        </li>
+
+                        {% endif %}
+
+
+                        <!-- FUNCIONÁRIOS -->
+
+                        {% if eh_gestor %}
+
+                        <li>
+
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('funcionarios') }}"
+                            >
+
+                                <i class="bi bi-people me-2"></i>
+
+                                Funcionários
+
+                            </a>
+
+                        </li>
+
+                        {% endif %}
+
+
+                        <!-- ADMIN -->
+
+                        {% if eh_adm %}
+
+                        <li>
+
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('admin_dashboard') }}"
+                            >
+
+                                <i class="bi bi-shield-lock me-2"></i>
+
+                                Administração
+
+                            </a>
+
+                        </li>
+
+                        {% endif %}
+
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+
+                        <!-- SAIR -->
+
+                        <li>
+
+                            <a
+                                class="dropdown-item text-danger"
+                                href="{{ url_for('logout') }}"
+                            >
+
+                                <i class="bi bi-box-arrow-right me-2"></i>
+
+                                Sair
+
+                            </a>
+
+                        </li>
+
+                    </ul>
 
                 </div>
 
-            {% endfor %}
+                {% endif %}
+
+            </div>
 
         </div>
 
-        {% endif %}
+    </div>
 
-    {% endwith %}
+</nav>
 
 
-    <!-- =========================================================
-         CONTEÚDO PRINCIPAL
-    ========================================================== -->
-    <main class="cp-main">
 
-        {% block content %}
+<!-- =========================================================
+     CONTEÚDO PRINCIPAL
+========================================================= -->
 
-            {% if error_code %}
+<main class="min-vh-100">
 
-            <div class="cp-content">
+    <!-- MENSAGENS FLASH -->
 
-                <div class="cp-error-page">
+    <div class="container-fluid px-3 px-lg-4 pt-3">
 
-                    <div>
+        {% with messages = get_flashed_messages(
+            with_categories=true
+        ) %}
 
-                        <div class="cp-error-code">
-                            {{ error_code }}
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div
+                        class="alert
+                        {% if category == 'success' %}
+                            alert-success
+                        {% elif category == 'danger' %}
+                            alert-danger
+                        {% elif category == 'warning' %}
+                            alert-warning
+                        {% elif category == 'info' %}
+                            alert-info
+                        {% else %}
+                            alert-secondary
+                        {% endif %}
+                        alert-dismissible fade show shadow-sm"
+                        role="alert"
+                    >
+
+                        <div class="d-flex align-items-start gap-2">
+
+                            {% if category == "success" %}
+
+                                <i class="bi bi-check-circle-fill mt-1"></i>
+
+                            {% elif category == "danger" %}
+
+                                <i class="bi bi-exclamation-octagon-fill mt-1"></i>
+
+                            {% elif category == "warning" %}
+
+                                <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+
+                            {% elif category == "info" %}
+
+                                <i class="bi bi-info-circle-fill mt-1"></i>
+
+                            {% else %}
+
+                                <i class="bi bi-info-circle mt-1"></i>
+
+                            {% endif %}
+
+                            <div>
+
+                                {{ message }}
+
+                            </div>
+
                         </div>
 
-                        <h1 class="mt-3">
-                            {{ error_title or 'Ocorreu um problema' }}
-                        </h1>
 
-                        <p>
-                            {{ error_message or 'A página solicitada não pôde ser carregada.' }}
-                        </p>
-
-                        <a
-                            href="{% if usuario_eh_admin %}{{ url_for('admin_dashboard') }}{% elif usuario_logado %}{{ url_for('dashboard') }}{% else %}{{ url_for('login') }}{% endif %}"
-                            class="btn btn-primary px-4"
-                        >
-                            <i class="bi bi-arrow-left me-1"></i>
-                            Voltar ao início
-                        </a>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert"
+                            aria-label="Fechar"
+                        ></button>
 
                     </div>
 
-                </div>
-
-            </div>
+                {% endfor %}
 
             {% endif %}
 
-        {% endblock %}
+        {% endwith %}
 
-    </main>
+    </div>
 
 
-    <!-- =========================================================
-         FOOTER
-    ========================================================== -->
-    <footer class="cp-footer">
+    <!-- BLOCO DAS PÁGINAS -->
 
-        <div class="cp-footer-inner">
+    {% block content %}
 
-            <div>
-                <strong>Construtora Pro</strong>
-                <span class="ms-1">
-                    — Gestão para construtoras e empreiteiras.
-                </span>
+    {% endblock %}
+
+</main>
+
+
+
+<!-- =========================================================
+     RODAPÉ
+========================================================= -->
+
+<footer class="bg-dark text-white mt-5">
+
+    <div class="container-fluid px-3 px-lg-4 py-4">
+
+        <div class="row g-4 align-items-center">
+
+
+            <div class="col-md-6">
+
+                <div class="d-flex align-items-center gap-2 mb-2">
+
+                    <span
+                        class="d-flex align-items-center justify-content-center bg-primary rounded-3"
+                        style="width: 34px; height: 34px;"
+                    >
+
+                        <i class="bi bi-buildings-fill"></i>
+
+                    </span>
+
+                    <strong>
+                        Construtora Pro
+                    </strong>
+
+                </div>
+
+                <p class="text-white-50 small mb-0">
+
+                    Gestão profissional de obras,
+                    materiais, ferramentas,
+                    funcionários e solicitações.
+
+                </p>
+
             </div>
 
-            <div>
-                © {{ current_year or 2026 }} Construtora Pro
+
+            <div class="col-md-6 text-md-end">
+
+                {% if empresa_atual %}
+
+                    <div class="small text-white-50">
+
+                        Empresa
+
+                    </div>
+
+                    <div class="fw-semibold">
+
+                        {{ empresa_atual.nome_fantasia }}
+
+                    </div>
+
+                {% else %}
+
+                    <div class="small text-white-50">
+
+                        Sistema de gestão
+
+                    </div>
+
+                    <div class="fw-semibold">
+
+                        Construtora Pro
+
+                    </div>
+
+                {% endif %}
+
             </div>
 
         </div>
 
-    </footer>
+
+        <hr class="border-secondary my-4">
 
 
-    <!-- =========================================================
-         BOOTSTRAP JS
-    ========================================================== -->
-    <script
-        src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-    ></script>
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
 
-    <!-- JS do sistema -->
-    <script
-        src="{{ url_for('static', filename='js/app.js') }}"
-    ></script>
+            <span class="small text-white-50">
 
-    {% block scripts %}
-    {% endblock %}
+                © {{ now().year if now is defined else "" }}
+                Construtora Pro
+
+            </span>
+
+            <span class="small text-white-50">
+
+                Sistema de gestão de empreiteiras
+
+            </span>
+
+        </div>
+
+    </div>
+
+</footer>
+
+
+
+<!-- Bootstrap JS -->
+
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+></script>
+
+
+<!-- JS principal -->
+
+<script
+    src="{{ url_for('static', filename='js/app.js') }}"
+></script>
+
+
+{% block scripts %}{% endblock %}
+
 
 </body>
+
 </html>
