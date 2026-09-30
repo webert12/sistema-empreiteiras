@@ -991,7 +991,7 @@ def login():
     if current_user.is_authenticated:
 
         return redirect(
-            url_for("dashboard")
+            url_for("empresa_dashboard")
         )
 
     if request.method == "POST":
@@ -1095,7 +1095,7 @@ def login():
                 )
 
         return redirect(
-            url_for("dashboard")
+            url_for("empresa_dashboard")
         )
 
     return render_template(
@@ -1126,33 +1126,25 @@ def logout():
 @app.route("/")
 @login_obrigatorio
 def dashboard():
-
+    """Roteador principal: separa completamente os dois painéis."""
     if eh_administrador():
+        return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("empresa_dashboard"))
 
-        empresas_count = Empresa.query.count()
-        obras_count = Obra.query.count()
-        usuarios_count = Usuario.query.count()
-        solicitacoes_pendentes = Solicitacao.query.filter_by(
-            status="pendente"
-        ).count()
 
-        return render_template(
-            "dashboard.html",
-            empresas_count=empresas_count,
-            obras_count=obras_count,
-            usuarios_count=usuarios_count,
-            solicitacoes_pendentes=solicitacoes_pendentes,
-        )
+# ============================================================
+# PAINEL DA EMPREITEIRA
+# ============================================================
 
+@app.route("/empresa/painel")
+@empresa_acesso_obrigatorio
+def empresa_dashboard():
     empresa = empresa_usuario_atual()
 
-    obras_count = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).count()
-
-    usuarios_count = Usuario.query.filter_by(
-        empresa_id=empresa.id
-    ).count()
+    obras_count = Obra.query.filter_by(empresa_id=empresa.id).count()
+    usuarios_count = Usuario.query.filter_by(empresa_id=empresa.id).count()
+    materiais_count = Material.query.filter_by(empresa_id=empresa.id, ativo=True).count()
+    ferramentas_count = Ferramenta.query.filter_by(empresa_id=empresa.id, ativo=True).count()
 
     solicitacoes_pendentes = Solicitacao.query.join(
         Obra,
@@ -1162,12 +1154,28 @@ def dashboard():
         Solicitacao.status == "pendente"
     ).count()
 
+    solicitacoes_compradas = Solicitacao.query.join(
+        Obra,
+        Solicitacao.obra_id == Obra.id
+    ).filter(
+        Obra.empresa_id == empresa.id,
+        Solicitacao.status == "comprado"
+    ).count()
+
+    obras = Obra.query.filter_by(
+        empresa_id=empresa.id
+    ).order_by(Obra.criado_em.desc()).limit(10).all()
+
     return render_template(
-        "dashboard.html",
+        "empresa_dashboard.html",
         empresa=empresa,
+        obras=obras,
         obras_count=obras_count,
         usuarios_count=usuarios_count,
+        materiais_count=materiais_count,
+        ferramentas_count=ferramentas_count,
         solicitacoes_pendentes=solicitacoes_pendentes,
+        solicitacoes_compradas=solicitacoes_compradas,
     )
 
 
@@ -1651,7 +1659,7 @@ def novo_usuario_empresa(empresa_id):
         )
 
         return redirect(
-            url_for("dashboard")
+            url_for("empresa_dashboard")
         )
 
     if empresa.id != current_user.empresa_id:
@@ -2242,7 +2250,7 @@ def alternar_status_funcionario(usuario_id):
 # ============================================================
 
 @app.route("/obras")
-@login_obrigatorio
+@empresa_acesso_obrigatorio
 def obras():
 
     lista_obras = obras_do_usuario()
@@ -2436,7 +2444,7 @@ def nova_obra():
 @app.route(
     "/obras/<int:obra_id>"
 )
-@login_obrigatorio
+@empresa_acesso_obrigatorio
 def obra_detalhes(obra_id):
 
     obra = obter_obra(
