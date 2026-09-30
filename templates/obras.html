@@ -1,587 +1,487 @@
 {% extends "base.html" %}
 
-{% block title %}Obras | Construtora Pro{% endblock %}
+{% block title %}Obras{% endblock %}
 
 {% block content %}
 
-<div class="page-header">
+<div class="container-fluid py-4">
 
-    <div>
-        <span class="section-eyebrow">
-            <i class="bi bi-buildings"></i>
-            GESTÃO DE OBRAS
-        </span>
+    <!-- CABEÇALHO -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
 
-        <h1>Obras</h1>
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="bi bi-building"></i>
+                Obras
+            </h2>
 
-        <p>
-            Gerencie as obras, clientes, responsáveis e informações
-            da sua empresa.
-        </p>
-    </div>
+            <p class="text-muted mb-0">
+                Gerencie as obras, equipes e atividades da sua empresa.
+            </p>
+        </div>
 
-    <div class="page-header-actions">
+        {% if eh_gestor() %}
         <a href="{{ url_for('nova_obra') }}" class="btn btn-primary">
             <i class="bi bi-plus-lg"></i>
             Nova obra
         </a>
-    </div>
-
-</div>
-
-
-<!-- RESUMO -->
-
-<div class="stats-grid">
-
-    <div class="stat-card">
-
-        <div class="stat-icon">
-            <i class="bi bi-buildings"></i>
-        </div>
-
-        <div class="stat-content">
-
-            <span class="stat-label">
-                Total de obras
-            </span>
-
-            <strong>
-                {{ obras|length }}
-            </strong>
-
-            <small>
-                <i class="bi bi-building"></i>
-                cadastradas
-            </small>
-
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-icon">
-            <i class="bi bi-play-circle"></i>
-        </div>
-
-        <div class="stat-content">
-
-            <span class="stat-label">
-                Em andamento
-            </span>
-
-            <strong>
-                {{ obras|selectattr('status', 'equalto', 'Em andamento')|list|length }}
-            </strong>
-
-            <small>
-                <i class="bi bi-activity"></i>
-                obras ativas
-            </small>
-
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-icon">
-            <i class="bi bi-check-circle"></i>
-        </div>
-
-        <div class="stat-content">
-
-            <span class="stat-label">
-                Concluídas
-            </span>
-
-            <strong>
-                {{ obras|selectattr('status', 'equalto', 'Concluída')|list|length }}
-            </strong>
-
-            <small>
-                <i class="bi bi-check2-all"></i>
-                finalizadas
-            </small>
-
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-icon">
-            <i class="bi bi-pause-circle"></i>
-        </div>
-
-        <div class="stat-content">
-
-            <span class="stat-label">
-                Pausadas
-            </span>
-
-            <strong>
-                {{ obras|selectattr('status', 'equalto', 'Pausada')|list|length }}
-            </strong>
-
-            <small>
-                <i class="bi bi-pause"></i>
-                temporariamente
-            </small>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- LISTAGEM -->
-
-<div class="dashboard-panel obras-panel">
-
-    <div class="panel-header">
-
-        <div>
-
-            <span class="panel-eyebrow">
-                <i class="bi bi-list-ul"></i>
-                LISTAGEM
-            </span>
-
-            <h3>
-                Obras cadastradas
-            </h3>
-
-        </div>
-
-        {% if obras %}
-        <span class="panel-count">
-            {{ obras|length }}
-            {% if obras|length == 1 %}
-                obra
-            {% else %}
-                obras
-            {% endif %}
-        </span>
         {% endif %}
 
     </div>
 
 
-    {% if obras %}
+    <!-- RESUMO -->
+    <div class="row g-3 mb-4">
 
-    <div class="table-responsive">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
 
-        <table class="table app-table align-middle">
+                    <div class="d-flex justify-content-between align-items-center">
 
-            <thead>
-
-                <tr>
-
-                    <th>Obra</th>
-
-                    <th>Cliente</th>
-
-                    <th>Responsável</th>
-
-                    <th>Início</th>
-
-                    <th>Previsão</th>
-
-                    <th>Status</th>
-
-                    <th class="text-end">
-                        Ações
-                    </th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-                {% for obra in obras %}
-
-                <tr>
-
-                    <!-- OBRA -->
-
-                    <td>
-
-                        <div class="table-primary-info">
-
-                            <div class="table-avatar">
-                                <i class="bi bi-building"></i>
+                        <div>
+                            <div class="text-muted small">
+                                Total de obras
                             </div>
 
-                            <div>
+                            <div class="fs-3 fw-bold">
+                                {{ obras|length }}
+                            </div>
+                        </div>
 
-                                <strong>
-                                    {{ obra.nome }}
-                                </strong>
+                        <div class="fs-2 text-primary">
+                            <i class="bi bi-buildings"></i>
+                        </div>
 
-                                {% if obra.endereco %}
-                                <span>
-                                    <i class="bi bi-geo-alt"></i>
-                                    {{ obra.endereco }}
-                                </span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small">
+                                Em andamento
+                            </div>
+
+                            <div class="fs-3 fw-bold">
+                                {{ obras|selectattr('status', 'equalto', 'em_andamento')|list|length }}
+                            </div>
+                        </div>
+
+                        <div class="fs-2 text-success">
+                            <i class="bi bi-cone-striped"></i>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small">
+                                Em planejamento
+                            </div>
+
+                            <div class="fs-3 fw-bold">
+                                {{ obras|selectattr('status', 'equalto', 'planejamento')|list|length }}
+                            </div>
+                        </div>
+
+                        <div class="fs-2 text-warning">
+                            <i class="bi bi-calendar-check"></i>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small">
+                                Concluídas
+                            </div>
+
+                            <div class="fs-3 fw-bold">
+                                {{ obras|selectattr('status', 'equalto', 'concluida')|list|length }}
+                            </div>
+                        </div>
+
+                        <div class="fs-2 text-secondary">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- FILTRO / PESQUISA -->
+    <div class="card border-0 shadow-sm mb-4">
+
+        <div class="card-body">
+
+            <div class="row g-3">
+
+                <div class="col-12 col-md-8">
+
+                    <label for="buscarObra" class="form-label fw-semibold">
+                        <i class="bi bi-search"></i>
+                        Pesquisar obra
+                    </label>
+
+                    <input
+                        type="text"
+                        id="buscarObra"
+                        class="form-control"
+                        placeholder="Digite o nome da obra ou endereço..."
+                        autocomplete="off"
+                    >
+
+                </div>
+
+                <div class="col-12 col-md-4">
+
+                    <label for="filtroStatus" class="form-label fw-semibold">
+                        <i class="bi bi-funnel"></i>
+                        Status
+                    </label>
+
+                    <select id="filtroStatus" class="form-select">
+
+                        <option value="">
+                            Todos os status
+                        </option>
+
+                        <option value="planejamento">
+                            Planejamento
+                        </option>
+
+                        <option value="em_andamento">
+                            Em andamento
+                        </option>
+
+                        <option value="pausada">
+                            Pausada
+                        </option>
+
+                        <option value="concluida">
+                            Concluída
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- LISTAGEM -->
+    {% if obras %}
+
+    <div class="row g-4" id="listaObras">
+
+        {% for obra in obras %}
+
+        <div
+            class="col-12 col-md-6 col-xl-4 obra-card"
+            data-nome="{{ obra.nome|lower }}"
+            data-endereco="{{ (obra.endereco or '')|lower }}"
+            data-status="{{ obra.status }}"
+        >
+
+            <div class="card border-0 shadow-sm h-100">
+
+                <div class="card-body d-flex flex-column">
+
+                    <!-- TÍTULO -->
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+
+                        <div>
+
+                            <h5 class="fw-bold mb-1">
+                                {{ obra.nome }}
+                            </h5>
+
+                            {% if obra.codigo %}
+                            <div class="text-muted small">
+                                Código: {{ obra.codigo }}
+                            </div>
+                            {% endif %}
+
+                        </div>
+
+
+                        {% if obra.status == 'planejamento' %}
+
+                            <span class="badge bg-warning text-dark">
+                                Planejamento
+                            </span>
+
+                        {% elif obra.status == 'em_andamento' %}
+
+                            <span class="badge bg-success">
+                                Em andamento
+                            </span>
+
+                        {% elif obra.status == 'pausada' %}
+
+                            <span class="badge bg-secondary">
+                                Pausada
+                            </span>
+
+                        {% elif obra.status == 'concluida' %}
+
+                            <span class="badge bg-dark">
+                                Concluída
+                            </span>
+
+                        {% else %}
+
+                            <span class="badge bg-secondary">
+                                {{ obra.status }}
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <!-- INFORMAÇÕES -->
+                    <div class="mb-3">
+
+                        {% if obra.endereco %}
+
+                        <div class="d-flex align-items-start gap-2 mb-2">
+
+                            <i class="bi bi-geo-alt text-primary"></i>
+
+                            <span class="small text-muted">
+                                {{ obra.endereco }}
+                            </span>
+
+                        </div>
+
+                        {% endif %}
+
+
+                        {% if obra.descricao %}
+
+                        <div class="d-flex align-items-start gap-2">
+
+                            <i class="bi bi-card-text text-primary"></i>
+
+                            <span class="small text-muted">
+                                {{ obra.descricao }}
+                            </span>
+
+                        </div>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <!-- EQUIPE -->
+                    <div class="border-top pt-3 mt-auto">
+
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+
+                            <span class="text-muted small">
+                                <i class="bi bi-people"></i>
+                                Equipe
+                            </span>
+
+                            <span class="badge bg-light text-dark border">
+                                {{ obra.equipe|length if obra.equipe is defined else 0 }}
+                                funcionário(s)
+                            </span>
+
+                        </div>
+
+
+                        <!-- AÇÕES -->
+                        <div class="d-grid gap-2">
+
+                            <a
+                                href="{{ url_for('detalhes_obra', obra_id=obra.id) }}"
+                                class="btn btn-primary"
+                            >
+                                <i class="bi bi-eye"></i>
+                                Abrir obra
+                            </a>
+
+
+                            {% if eh_gestor() %}
+
+                            <div class="row g-2">
+
+                                <div class="col-6">
+
+                                    <a
+                                        href="{{ url_for('editar_obra', obra_id=obra.id) }}"
+                                        class="btn btn-outline-secondary w-100"
+                                    >
+                                        <i class="bi bi-pencil"></i>
+                                        Editar
+                                    </a>
+
+                                </div>
+
+
+                                {% if obra.status != 'concluida' %}
+
+                                <div class="col-6">
+
+                                    <form
+                                        method="POST"
+                                        action="{{ url_for('finalizar_obra', obra_id=obra.id) }}"
+                                        onsubmit="return confirmarAcao(
+                                            'Tem certeza que deseja finalizar esta obra? Depois de finalizada, novas solicitações de materiais e ferramentas não poderão ser feitas.'
+                                        );"
+                                    >
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-outline-success w-100"
+                                        >
+                                            <i class="bi bi-check2-circle"></i>
+                                            Finalizar
+                                        </button>
+
+                                    </form>
+
+                                </div>
+
                                 {% endif %}
 
                             </div>
 
-                        </div>
 
-                    </td>
-
-
-                    <!-- CLIENTE -->
-
-                    <td>
-
-                        {% if obra.cliente %}
-
-                        <span class="table-text">
-                            {{ obra.cliente }}
-                        </span>
-
-                        {% else %}
-
-                        <span class="text-muted">
-                            Não informado
-                        </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- RESPONSÁVEL -->
-
-                    <td>
-
-                        {% if obra.responsavel %}
-
-                        <span class="table-text">
-                            {{ obra.responsavel }}
-                        </span>
-
-                        {% else %}
-
-                        <span class="text-muted">
-                            Não informado
-                        </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- DATA INÍCIO -->
-
-                    <td>
-
-                        {% if obra.data_inicio %}
-
-                        <span class="date-cell">
-                            <i class="bi bi-calendar-event"></i>
-                            {{ obra.data_inicio.strftime('%d/%m/%Y') }}
-                        </span>
-
-                        {% else %}
-
-                        <span class="text-muted">
-                            —
-                        </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- PREVISÃO -->
-
-                    <td>
-
-                        {% if obra.previsao_termino %}
-
-                        <span class="date-cell">
-                            <i class="bi bi-calendar-check"></i>
-                            {{ obra.previsao_termino.strftime('%d/%m/%Y') }}
-                        </span>
-
-                        {% else %}
-
-                        <span class="text-muted">
-                            —
-                        </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- STATUS -->
-
-                    <td>
-
-                        {% if obra.status == 'Em andamento' %}
-
-                        <span class="status-badge status-success">
-                            <i class="bi bi-circle-fill"></i>
-                            Em andamento
-                        </span>
-
-                        {% elif obra.status == 'Concluída' %}
-
-                        <span class="status-badge status-info">
-                            <i class="bi bi-check-circle-fill"></i>
-                            Concluída
-                        </span>
-
-                        {% elif obra.status == 'Pausada' %}
-
-                        <span class="status-badge status-warning">
-                            <i class="bi bi-pause-circle-fill"></i>
-                            Pausada
-                        </span>
-
-                        {% elif obra.status == 'Cancelada' %}
-
-                        <span class="status-badge status-danger">
-                            <i class="bi bi-x-circle-fill"></i>
-                            Cancelada
-                        </span>
-
-                        {% else %}
-
-                        <span class="status-badge status-secondary">
-                            <i class="bi bi-clock"></i>
-                            {{ obra.status or 'Planejamento' }}
-                        </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- AÇÕES -->
-
-                    <td class="text-end">
-
-                        <div class="table-actions">
-
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-light"
-                                title="Visualizar"
-                                onclick="showObraInfo(
-                                    '{{ obra.nome|e }}',
-                                    '{{ obra.cliente|default('Não informado')|e }}',
-                                    '{{ obra.responsavel|default('Não informado')|e }}',
-                                    '{{ obra.status|default('Planejamento')|e }}',
-                                    '{{ obra.endereco|default('Não informado')|e }}'
-                                )"
+                            <form
+                                method="POST"
+                                action="{{ url_for('excluir_obra', obra_id=obra.id) }}"
+                                onsubmit="return confirmarAcao(
+                                    'Deseja realmente excluir esta obra? Esta ação não poderá ser desfeita.'
+                                );"
                             >
-                                <i class="bi bi-eye"></i>
-                            </button>
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-outline-danger w-100"
+                                >
+                                    <i class="bi bi-trash"></i>
+                                    Excluir obra
+                                </button>
+
+                            </form>
+
+                            {% endif %}
 
                         </div>
 
-                    </td>
+                    </div>
 
-                </tr>
+                </div>
 
-                {% endfor %}
+            </div>
 
-            </tbody>
+        </div>
 
-        </table>
+        {% endfor %}
 
     </div>
 
+
+    <!-- SEM RESULTADOS -->
+    <div
+        id="semResultados"
+        class="card border-0 shadow-sm text-center py-5 d-none"
+    >
+
+        <div class="card-body">
+
+            <i class="bi bi-search fs-1 text-muted"></i>
+
+            <h5 class="fw-bold mt-3">
+                Nenhuma obra encontrada
+            </h5>
+
+            <p class="text-muted mb-0">
+                Tente pesquisar por outro nome, endereço ou status.
+            </p>
+
+        </div>
+
+    </div>
 
     {% else %}
 
     <!-- ESTADO VAZIO -->
+    <div class="card border-0 shadow-sm">
 
-    <div class="empty-state">
+        <div class="card-body text-center py-5">
 
-        <div class="empty-state-icon">
-            <i class="bi bi-buildings"></i>
+            <div class="mb-3">
+                <i class="bi bi-building-add fs-1 text-muted"></i>
+            </div>
+
+            <h4 class="fw-bold">
+                Nenhuma obra cadastrada
+            </h4>
+
+            <p class="text-muted mb-4">
+                Comece cadastrando a primeira obra da sua empresa.
+            </p>
+
+            {% if eh_gestor() %}
+
+            <a
+                href="{{ url_for('nova_obra') }}"
+                class="btn btn-primary"
+            >
+                <i class="bi bi-plus-lg"></i>
+                Cadastrar primeira obra
+            </a>
+
+            {% endif %}
+
         </div>
-
-        <h4>
-            Nenhuma obra cadastrada
-        </h4>
-
-        <p>
-            Cadastre sua primeira obra para começar
-            a organizar a gestão da construção.
-        </p>
-
-        <a
-            href="{{ url_for('nova_obra') }}"
-            class="btn btn-primary"
-        >
-            <i class="bi bi-plus-lg"></i>
-            Cadastrar primeira obra
-        </a>
 
     </div>
 
     {% endif %}
-
-</div>
-
-
-<!-- INFORMAÇÃO -->
-
-<div class="dashboard-info-banner">
-
-    <div class="dashboard-info-icon">
-        <i class="bi bi-lightbulb"></i>
-    </div>
-
-    <div>
-
-        <strong>
-            Gestão centralizada
-        </strong>
-
-        <p>
-            Em breve você poderá acompanhar materiais,
-            equipes, solicitações, diário de obra,
-            compras e demais informações diretamente
-            dentro de cada obra.
-        </p>
-
-    </div>
-
-</div>
-
-
-<!-- MODAL DE VISUALIZAÇÃO -->
-
-<div
-    class="modal fade"
-    id="obraInfoModal"
-    tabindex="-1"
-    aria-hidden="true"
->
-
-    <div class="modal-dialog modal-dialog-centered">
-
-        <div class="modal-content">
-
-            <div class="modal-header">
-
-                <div>
-
-                    <span class="panel-eyebrow">
-                        <i class="bi bi-building"></i>
-                        DETALHES DA OBRA
-                    </span>
-
-                    <h5 class="modal-title" id="obraModalNome">
-                        Obra
-                    </h5>
-
-                </div>
-
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                    aria-label="Fechar"
-                ></button>
-
-            </div>
-
-
-            <div class="modal-body">
-
-                <div class="modal-detail-list">
-
-                    <div class="modal-detail-item">
-
-                        <span>
-                            <i class="bi bi-person"></i>
-                            Cliente
-                        </span>
-
-                        <strong id="obraModalCliente">
-                            —
-                        </strong>
-
-                    </div>
-
-
-                    <div class="modal-detail-item">
-
-                        <span>
-                            <i class="bi bi-person-badge"></i>
-                            Responsável
-                        </span>
-
-                        <strong id="obraModalResponsavel">
-                            —
-                        </strong>
-
-                    </div>
-
-
-                    <div class="modal-detail-item">
-
-                        <span>
-                            <i class="bi bi-activity"></i>
-                            Status
-                        </span>
-
-                        <strong id="obraModalStatus">
-                            —
-                        </strong>
-
-                    </div>
-
-
-                    <div class="modal-detail-item">
-
-                        <span>
-                            <i class="bi bi-geo-alt"></i>
-                            Endereço
-                        </span>
-
-                        <strong id="obraModalEndereco">
-                            —
-                        </strong>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="modal-footer">
-
-                <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal"
-                >
-                    Fechar
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
 
 </div>
 
@@ -592,30 +492,89 @@
 
 <script>
 
-function showObraInfo(nome, cliente, responsavel, status, endereco) {
+document.addEventListener("DOMContentLoaded", function () {
 
-    document.getElementById("obraModalNome").textContent =
-        nome || "Obra";
+    const campoBusca = document.getElementById("buscarObra");
+    const filtroStatus = document.getElementById("filtroStatus");
+    const cards = document.querySelectorAll(".obra-card");
+    const semResultados = document.getElementById("semResultados");
 
-    document.getElementById("obraModalCliente").textContent =
-        cliente || "Não informado";
+    function filtrarObras() {
 
-    document.getElementById("obraModalResponsavel").textContent =
-        responsavel || "Não informado";
+        if (!cards.length) {
+            return;
+        }
 
-    document.getElementById("obraModalStatus").textContent =
-        status || "Planejamento";
+        const busca = (campoBusca.value || "").toLowerCase().trim();
+        const status = filtroStatus.value;
 
-    document.getElementById("obraModalEndereco").textContent =
-        endereco || "Não informado";
+        let encontrados = 0;
 
-    const modalElement =
-        document.getElementById("obraInfoModal");
+        cards.forEach(function (card) {
 
-    const modal =
-        new bootstrap.Modal(modalElement);
+            const nome = card.dataset.nome || "";
+            const endereco = card.dataset.endereco || "";
+            const statusObra = card.dataset.status || "";
 
-    modal.show();
+            const correspondeBusca =
+                !busca ||
+                nome.includes(busca) ||
+                endereco.includes(busca);
+
+            const correspondeStatus =
+                !status ||
+                statusObra === status;
+
+            if (correspondeBusca && correspondeStatus) {
+
+                card.classList.remove("d-none");
+                encontrados++;
+
+            } else {
+
+                card.classList.add("d-none");
+
+            }
+
+        });
+
+
+        if (semResultados) {
+
+            if (encontrados === 0) {
+                semResultados.classList.remove("d-none");
+            } else {
+                semResultados.classList.add("d-none");
+            }
+
+        }
+
+    }
+
+
+    if (campoBusca) {
+        campoBusca.addEventListener("input", filtrarObras);
+    }
+
+    if (filtroStatus) {
+        filtroStatus.addEventListener("change", filtrarObras);
+    }
+
+});
+
+
+/*
+ * Confirma ações importantes.
+ *
+ * Se o app.js já possuir uma função confirmarAcao(),
+ * esta função não interfere nela.
+ */
+if (typeof window.confirmarAcao !== "function") {
+
+    window.confirmarAcao = function (mensagem) {
+        return window.confirm(mensagem);
+    };
+
 }
 
 </script>
