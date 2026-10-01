@@ -1285,6 +1285,26 @@ def inicializar_banco():
         for coluna, definicao in colunas.items():
             adicionar_coluna(tabela, coluna, definicao)
 
+    # Versões antigas do sistema chegaram a criar material_id e/ou
+    # ferramenta_id como NOT NULL. Uma solicitação agora pode representar
+    # material OU ferramenta, portanto os dois vínculos precisam aceitar NULL.
+    # No PostgreSQL fazemos a alteração diretamente; no SQLite o modelo novo
+    # já é usado para novas tabelas e instalações antigas continuam compatíveis
+    # quando essas colunas já eram opcionais.
+    try:
+        if db.engine.dialect.name == "postgresql":
+            with db.engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE solicitacoes ALTER COLUMN material_id DROP NOT NULL"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE solicitacoes ALTER COLUMN ferramenta_id DROP NOT NULL"
+                ))
+                logging.info("Solicitacoes: material_id e ferramenta_id aceitam NULL.")
+    except Exception:
+        logging.exception("Falha ao ajustar nulabilidade das colunas de solicitacoes.")
+        raise
+
     # Depois compara o schema atual com o metadata do SQLAlchemy. Isso evita
     # que uma coluna criada em uma versão intermediária volte a causar 500.
     inspector = inspect(db.engine)
@@ -1316,19 +1336,6 @@ def inicializar_banco():
                 # puder ser criada, o Render deve mostrar a causa no log.
                 logging.exception("Falha ao compatibilizar %s.%s", tabela, coluna.name)
                 raise
-
-    # Solicitações podem ser de material OU ferramenta. Em bancos legados,
-    # versões antigas podem ter deixado material_id/ferramenta_id como NOT NULL.
-    # Isso fazia qualquer solicitação do tipo oposto falhar no commit.
-    if db.engine.dialect.name == "postgresql" and "solicitacoes" in tabelas_existentes:
-        try:
-            with db.engine.begin() as conn:
-                conn.execute(text("ALTER TABLE solicitacoes ALTER COLUMN material_id DROP NOT NULL"))
-                conn.execute(text("ALTER TABLE solicitacoes ALTER COLUMN ferramenta_id DROP NOT NULL"))
-            logging.info("Colunas material_id/ferramenta_id da tabela solicitacoes ajustadas para aceitar NULL.")
-        except Exception:
-            logging.exception("Falha ao ajustar nulabilidade das referências de solicitacoes.")
-            raise
 
     # Valores seguros para registros antigos.
     try:
@@ -4147,21 +4154,21 @@ MATERIAIS_CATALOGO = [
     {
         "nome": "Argamassa AC-I",
         "categoria": "Cimento e argamassas",
-        "unidade": "kg",
+        "unidade": "saco",
         "descricao": "Argamassa colante para áreas internas."
     },
 
     {
         "nome": "Argamassa AC-II",
         "categoria": "Cimento e argamassas",
-        "unidade": "kg",
+        "unidade": "saco",
         "descricao": "Argamassa colante para áreas internas e externas."
     },
 
     {
         "nome": "Argamassa AC-III",
         "categoria": "Cimento e argamassas",
-        "unidade": "kg",
+        "unidade": "saco",
         "descricao": "Argamassa colante de maior desempenho."
     },
 
@@ -5019,7 +5026,7 @@ def dados_ferramentas_catalogo():
         {
             "nome": item["nome"],
             "categoria": item["categoria"],
-            "unidade": "un",
+            "unidade": item["unidade"],
             "descricao": item.get("descricao", ""),
         }
         for item in FERRAMENTAS_CATALOGO
@@ -5084,82 +5091,137 @@ def materiais():
 )
 @gestao_empresa_obrigatorio
 def novo_material():
-    """Cadastro em lote de materiais do catálogo, com estoque inicial por item."""
+
     empresa = empresa_usuario_atual()
+
     if not empresa:
-        flash("Empresa não encontrada.", "danger")
-        return redirect(url_for("empresa_dashboard"))
+
+        flash(
+            "Empresa não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("empresa_dashboard")
+        )
 
     if request.method == "POST":
+
+        nome = (
+            request.form.get("nome")
+            or ""
+        ).strip()
+
+        catalogo = material_catalogo_por_nome(
+            nome
+        )
+
+        if catalogo:
+
+            categoria = catalogo["categoria"]
+
+            unidade = catalogo["unidade"]
+
+            descricao = catalogo.get(
+                "descricao",
+                ""
+            )
+
+        else:
+
+            categoria = (
+                request.form.get("categoria")
+                or "Outros"
+            ).strip()
+
+            unidade = (
+                request.form.get("unidade")
+                or "un"
+            ).strip()
+
+            descricao = (
+                request.form.get("descricao")
+                or ""
+            ).strip()
+
+        if not nome:
+
+            flash(
+                "Informe o nome do material.",
+                "danger"
+            )
+
+            return render_template(
+                "material_form.html",
+                material=None,
+                empresa=empresa,
+                catalogo_materiais=dados_material_catalogo(),
+                titulo="Novo material"
+            )
+
         try:
-            selecionados = request.form.getlist("recursos")
-            if not selecionados:
-                flash("Marque pelo menos um material para adicionar.", "danger")
-                return redirect(url_for("novo_material"))
 
-            criados = 0
-            atualizados = 0
-            for chave in selecionados:
-                partes = chave.split(":", 1)
-                if len(partes) != 2 or partes[0] != "material":
-                    raise ValueError("Material selecionado inválido.")
-                try:
-                    item_id = int(partes[1])
-                except (ValueError, TypeError):
-                    raise ValueError("Material selecionado inválido.")
-                if not 0 <= item_id < len(MATERIAIS_CATALOGO):
-                    raise ValueError("Material selecionado não existe no catálogo.")
+            estoque_minimo = float(
+                request.form.get(
+                    "estoque_minimo",
+                    0
+                ) or 0
+            )
 
-                item = MATERIAIS_CATALOGO[item_id]
-                raw = request.form.get(f"quantidade_material_{item_id}", "0")
-                try:
-                    quantidade = float(str(raw or "0").replace(",", "."))
-                except (ValueError, TypeError):
-                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
-                if quantidade < 0:
-                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
+        except (
+            ValueError,
+            TypeError
+        ):
 
-                recurso = Material.query.filter(
-                    Material.empresa_id == empresa.id,
-                    db.func.lower(Material.nome) == item["nome"].lower(),
-                ).first()
+            estoque_minimo = 0
 
-                if recurso:
-                    recurso.categoria = item["categoria"]
-                    recurso.unidade = item.get("unidade", "un")
-                    recurso.descricao = item.get("descricao", "")
-                    recurso.ativo = True
-                    recurso.estoque_atual = float(recurso.estoque_atual or 0) + quantidade
-                    atualizados += 1
-                else:
-                    db.session.add(Material(
-                        empresa_id=empresa.id,
-                        categoria=item["categoria"],
-                        nome=item["nome"],
-                        descricao=item.get("descricao", ""),
-                        unidade=item.get("unidade", "un"),
-                        estoque_minimo=0,
-                        estoque_atual=quantidade,
-                        ativo=True,
-                    ))
-                    criados += 1
+        material = Material(
+            empresa_id=empresa.id,
+            categoria=categoria,
+            nome=nome,
+            descricao=descricao,
+            unidade=unidade,
+            estoque_minimo=estoque_minimo,
+            estoque_atual=0,
+            ativo=True,
+        )
+
+        db.session.add(
+            material
+        )
+
+        try:
 
             db.session.commit()
-            flash(f"{criados + atualizados} material(is) processado(s). Estoque inicial atualizado.", "success")
-            return redirect(url_for("materiais"))
+
+            flash(
+                "Material cadastrado com sucesso.",
+                "success"
+            )
+
+            return redirect(
+                url_for("materiais")
+            )
+
         except Exception:
+
             db.session.rollback()
-            logging.exception("ERRO AO CADASTRAR MATERIAIS EM LOTE: selecionados=%s", request.form.getlist("recursos"))
-            flash("Não foi possível cadastrar os materiais. O erro foi registrado no servidor.", "danger")
-            return redirect(url_for("novo_material"))
+
+            logging.exception(
+                "Erro ao cadastrar material"
+            )
+
+            flash(
+                "Não foi possível cadastrar o material.",
+                "danger"
+            )
 
     return render_template(
         "material_form.html",
         material=None,
         empresa=empresa,
         catalogo_materiais=dados_material_catalogo(),
-        titulo="Adicionar materiais",
-        modo_lote=True,
+        titulo="Novo material"
     )
 
 
@@ -5413,6 +5475,100 @@ def solicitacoes():
 
 
 # ============================================================
+# NOVA SOLICITAÇÃO — HELPERS
+# ============================================================
+
+def _quantidade_positiva(valor, nome="item"):
+    try:
+        quantidade = float(str(valor or "").strip().replace(",", "."))
+    except (ValueError, TypeError):
+        raise ValueError(f"Informe uma quantidade válida para {nome}.")
+    if quantidade <= 0:
+        raise ValueError(f"Informe uma quantidade maior que zero para {nome}.")
+    return quantidade
+
+
+def _obter_ou_criar_recurso_solicitacao(
+    empresa_id, tipo, nome, categoria, unidade, descricao=""
+):
+    nome_limpo = (nome or "").strip()
+    if not nome_limpo:
+        raise ValueError("O nome do recurso é obrigatório.")
+
+    unidade = (unidade or "un").strip() or "un"
+    categoria = (categoria or "Outros").strip() or "Outros"
+
+    if tipo == "material":
+        recurso = Material.query.filter(
+            Material.empresa_id == empresa_id,
+            db.func.lower(Material.nome) == nome_limpo.lower(),
+        ).first()
+        if not recurso:
+            recurso = Material(
+                empresa_id=empresa_id,
+                categoria=categoria,
+                nome=nome_limpo,
+                descricao=descricao or "",
+                unidade=unidade,
+                estoque_minimo=0,
+                estoque_atual=0,
+                ativo=True,
+            )
+            db.session.add(recurso)
+            db.session.flush()
+        else:
+            recurso.ativo = True
+        return recurso
+
+    if tipo == "ferramenta":
+        recurso = Ferramenta.query.filter(
+            Ferramenta.empresa_id == empresa_id,
+            db.func.lower(Ferramenta.nome) == nome_limpo.lower(),
+        ).first()
+        if not recurso:
+            recurso = Ferramenta(
+                empresa_id=empresa_id,
+                categoria=categoria,
+                nome=nome_limpo,
+                descricao=descricao or "",
+                unidade="un",
+                estoque_minimo=0,
+                estoque_atual=0,
+                ativo=True,
+            )
+            db.session.add(recurso)
+            db.session.flush()
+        else:
+            recurso.ativo = True
+        return recurso
+
+    raise ValueError("Tipo de recurso inválido.")
+
+
+def _criar_solicitacao_pendente(obra, tipo, recurso, quantidade, observacao):
+    if tipo == "material":
+        material_id = recurso.id
+        ferramenta_id = None
+    else:
+        material_id = None
+        ferramenta_id = recurso.id
+
+    db.session.add(
+        Solicitacao(
+            obra_id=obra.id,
+            material_id=material_id,
+            ferramenta_id=ferramenta_id,
+            usuario_id=current_user.id,
+            quantidade=quantidade,
+            observacao=observacao,
+            status="pendente",
+            tipo_recurso=tipo,
+            recurso_nome=recurso.nome,
+        )
+    )
+
+
+# ============================================================
 # NOVA SOLICITAÇÃO
 # ============================================================
 
@@ -5422,11 +5578,10 @@ def solicitacoes():
 )
 @empresa_acesso_obrigatorio
 def nova_solicitacao():
-    """Cria solicitações de compra usando o catálogo completo, sem consultar o estoque.
+    """Cria solicitações sem limitar o usuário ao catálogo.
 
-    Cada item marcado vira uma solicitação independente. O recurso é criado
-    no cadastro da empresa com estoque zero quando ainda não existir, para
-    que a compra posterior possa alimentar o estoque.
+    O usuário pode marcar itens do catálogo e/ou cadastrar itens manualmente.
+    O estoque atual nunca impede uma solicitação.
     """
     empresa_id = current_user.empresa_id
     obras_disponiveis = obras_do_usuario()
@@ -5445,21 +5600,18 @@ def nova_solicitacao():
             flash("Selecione uma obra válida e acessível.", "danger")
             return redirect(url_for("nova_solicitacao"))
 
+        if tipo not in ("material", "ferramenta", "outro"):
+            flash("Tipo de solicitação inválido.", "danger")
+            return redirect(url_for("nova_solicitacao"))
+
         try:
+            criadas = 0
+
             if tipo in ("material", "ferramenta"):
                 selecionados = request.form.getlist("recursos")
-                if not selecionados:
-                    flash("Marque pelo menos um recurso para solicitar.", "danger")
-                    return redirect(url_for("nova_solicitacao"))
+                catalogo = MATERIAIS_CATALOGO if tipo == "material" else FERRAMENTAS_CATALOGO
 
-                catalogo = (
-                    MATERIAIS_CATALOGO
-                    if tipo == "material"
-                    else FERRAMENTAS_CATALOGO
-                )
-
-                criadas = 0
-
+                # Itens escolhidos no catálogo.
                 for chave in selecionados:
                     partes = chave.split(":", 1)
                     if len(partes) != 2 or partes[0] != tipo:
@@ -5475,121 +5627,91 @@ def nova_solicitacao():
 
                     item = catalogo[item_id]
                     quantidade_raw = request.form.get(
-                        f"quantidade_{tipo}_{item_id}",
-                        "1"
+                        f"quantidade_{tipo}_{item_id}", "1"
                     )
-
-                    try:
-                        quantidade = float(
-                            str(quantidade_raw or "1").replace(",", ".")
-                        )
-                    except (ValueError, TypeError):
-                        raise ValueError(
-                            f"Quantidade inválida para {item['nome']}."
-                        )
-
-                    if quantidade <= 0:
-                        raise ValueError(
-                            f"Informe uma quantidade válida para {item['nome']}."
-                        )
-
-                    if tipo == "material":
-                        recurso = Material.query.filter(
-                            Material.empresa_id == empresa_id,
-                            db.func.lower(Material.nome) == item["nome"].lower(),
-                        ).first()
-
-                        if not recurso:
-                            recurso = Material(
-                                empresa_id=empresa_id,
-                                categoria=item["categoria"],
-                                nome=item["nome"],
-                                descricao=item.get("descricao", ""),
-                                unidade=item.get("unidade", "un"),
-                                estoque_minimo=0,
-                                estoque_atual=0,
-                                ativo=True,
-                            )
-                            db.session.add(recurso)
-                            db.session.flush()
-                        elif not recurso.ativo:
-                            recurso.ativo = True
-
-                        nova = Solicitacao(
-                            obra_id=obra.id,
-                            material_id=recurso.id,
-                            ferramenta_id=None,
-                            usuario_id=current_user.id,
-                            quantidade=quantidade,
-                            observacao=observacao,
-                            status="pendente",
-                            tipo_recurso="material",
-                            recurso_nome=recurso.nome,
-                        )
-
-                    else:
-                        recurso = Ferramenta.query.filter(
-                            Ferramenta.empresa_id == empresa_id,
-                            db.func.lower(Ferramenta.nome) == item["nome"].lower(),
-                        ).first()
-
-                        if not recurso:
-                            recurso = Ferramenta(
-                                empresa_id=empresa_id,
-                                categoria=item["categoria"],
-                                nome=item["nome"],
-                                descricao=item.get("descricao", ""),
-                                unidade=item.get("unidade", "un"),
-                                estoque_minimo=0,
-                                estoque_atual=0,
-                                ativo=True,
-                            )
-                            db.session.add(recurso)
-                            db.session.flush()
-                        elif not recurso.ativo:
-                            recurso.ativo = True
-
-                        nova = Solicitacao(
-                            obra_id=obra.id,
-                            material_id=None,
-                            ferramenta_id=recurso.id,
-                            usuario_id=current_user.id,
-                            quantidade=quantidade,
-                            observacao=observacao,
-                            status="pendente",
-                            tipo_recurso="ferramenta",
-                            recurso_nome=recurso.nome,
-                        )
-
-                    db.session.add(nova)
+                    quantidade = _quantidade_positiva(quantidade_raw, item["nome"])
+                    unidade = item.get("unidade", "un")
+                    recurso = _obter_ou_criar_recurso_solicitacao(
+                        empresa_id=empresa_id,
+                        tipo=tipo,
+                        nome=item["nome"],
+                        categoria=item.get("categoria", "Outros"),
+                        unidade=unidade,
+                        descricao=item.get("descricao", ""),
+                    )
+                    _criar_solicitacao_pendente(
+                        obra=obra,
+                        tipo=tipo,
+                        recurso=recurso,
+                        quantidade=quantidade,
+                        observacao=observacao,
+                    )
                     criadas += 1
 
+                # Itens digitados manualmente. Os arrays permitem adicionar
+                # vários itens que não estão no catálogo na mesma solicitação.
+                nomes = request.form.getlist("custom_nome[]")
+                quantidades = request.form.getlist("custom_quantidade[]")
+                unidades = request.form.getlist("custom_unidade[]")
+
+                for idx, nome_raw in enumerate(nomes):
+                    nome = (nome_raw or "").strip()
+                    if not nome:
+                        continue
+
+                    quantidade_raw = quantidades[idx] if idx < len(quantidades) else ""
+                    quantidade = _quantidade_positiva(quantidade_raw, nome)
+                    if tipo == "ferramenta":
+                        unidade = "un"
+                    else:
+                        unidade = (
+                            unidades[idx].strip()
+                            if idx < len(unidades) and unidades[idx].strip()
+                            else "un"
+                        )
+
+                    recurso = _obter_ou_criar_recurso_solicitacao(
+                        empresa_id=empresa_id,
+                        tipo=tipo,
+                        nome=nome,
+                        categoria="Outros",
+                        unidade=unidade,
+                        descricao="Item cadastrado manualmente durante a solicitação.",
+                    )
+                    _criar_solicitacao_pendente(
+                        obra=obra,
+                        tipo=tipo,
+                        recurso=recurso,
+                        quantidade=quantidade,
+                        observacao=observacao,
+                    )
+                    criadas += 1
+
+                if criadas == 0:
+                    raise ValueError(
+                        "Marque um item do catálogo ou adicione pelo menos um item manual."
+                    )
+
                 db.session.commit()
-                flash(
-                    f"{criadas} solicitação(ões) enviada(s) para compra.",
-                    "success",
-                )
+                flash(f"{criadas} solicitação(ões) enviada(s) para compra.", "success")
                 return redirect(url_for("solicitacoes"))
 
+            # Tipo livre sem vínculo de estoque.
             if tipo == "outro":
                 recurso_nome = (request.form.get("recurso_nome") or "").strip()
-                try:
-                    quantidade = float(
-                        str(request.form.get("quantidade") or "").replace(",", ".")
-                    )
-                except (ValueError, TypeError):
-                    quantidade = 0
+                quantidade = _quantidade_positiva(
+                    request.form.get("quantidade") or "", recurso_nome or "recurso"
+                ) if recurso_nome else 0
 
                 if not recurso_nome or quantidade <= 0:
-                    flash(
-                        "Informe o recurso e uma quantidade válida.",
-                        "danger",
-                    )
+                    flash("Informe o recurso e uma quantidade válida.", "danger")
                     return redirect(url_for("nova_solicitacao"))
 
                 db.session.add(
                     Solicitacao(
                         obra_id=obra.id,
+                        material_id=None,
+                        ferramenta_id=None,
                         usuario_id=current_user.id,
                         quantidade=quantidade,
                         observacao=observacao,
@@ -5602,18 +5724,19 @@ def nova_solicitacao():
                 flash("Solicitação enviada para compra.", "success")
                 return redirect(url_for("solicitacoes"))
 
-            flash("Tipo de solicitação inválido.", "danger")
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
             return redirect(url_for("nova_solicitacao"))
-
-        except IntegrityError as exc:
+        except IntegrityError:
             db.session.rollback()
             logging.exception(
-                "ERRO DE INTEGRIDADE AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s selecionados=%s",
-                empresa_id, obra_id, tipo, request.form.getlist("recursos"),
+                "INTEGRITY ERROR AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s",
+                empresa_id, obra_id, tipo,
             )
             flash(
-                "Não foi possível gravar a solicitação porque o banco ainda possui uma estrutura antiga. "
-                "Faça o novo deploy desta versão para aplicar a correção automática do banco.",
+                "Não foi possível enviar a solicitação por causa de uma incompatibilidade no banco. "
+                "A correção foi registrada no log do servidor.",
                 "danger",
             )
             return redirect(url_for("nova_solicitacao"))
@@ -6164,80 +6287,132 @@ def ferramentas():
 )
 @gestao_empresa_obrigatorio
 def nova_ferramenta():
-    """Cadastro em lote de ferramentas do catálogo, sempre por unidade."""
-    empresa = empresa_usuario_atual()
-    if not empresa:
-        flash("Empresa não encontrada.", "danger")
-        return redirect(url_for("empresa_dashboard"))
 
     if request.method == "POST":
+
+        nome = (request.form.get("nome") or "").strip()
+        catalogo = ferramenta_catalogo_por_nome(nome)
+
+        categoria = (
+            catalogo["categoria"] if catalogo else request.form.get("categoria")
+            or ""
+        ).strip()
+
+        descricao = (
+            request.form.get("descricao")
+            or ""
+        ).strip()
+
+        unidade = (
+            catalogo["unidade"] if catalogo else request.form.get("unidade")
+            or "un"
+        ).strip()
+
+        if catalogo:
+            descricao = catalogo.get("descricao", "")
+
         try:
-            selecionados = request.form.getlist("recursos")
-            if not selecionados:
-                flash("Marque pelo menos uma ferramenta para adicionar.", "danger")
-                return redirect(url_for("nova_ferramenta"))
 
-            criados = 0
-            atualizados = 0
-            for chave in selecionados:
-                partes = chave.split(":", 1)
-                if len(partes) != 2 or partes[0] != "ferramenta":
-                    raise ValueError("Ferramenta selecionada inválida.")
-                try:
-                    item_id = int(partes[1])
-                except (ValueError, TypeError):
-                    raise ValueError("Ferramenta selecionada inválida.")
-                if not 0 <= item_id < len(FERRAMENTAS_CATALOGO):
-                    raise ValueError("Ferramenta selecionada não existe no catálogo.")
+            estoque_minimo = float(
+                request.form.get(
+                    "estoque_minimo",
+                    0
+                )
+                or 0
+            )
 
-                item = FERRAMENTAS_CATALOGO[item_id]
-                raw = request.form.get(f"quantidade_ferramenta_{item_id}", "0")
-                try:
-                    quantidade = float(str(raw or "0").replace(",", "."))
-                except (ValueError, TypeError):
-                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
-                if quantidade < 0:
-                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
+            estoque_atual = float(
+                request.form.get(
+                    "estoque_atual",
+                    0
+                )
+                or 0
+            )
 
-                recurso = Ferramenta.query.filter(
-                    Ferramenta.empresa_id == empresa.id,
-                    db.func.lower(Ferramenta.nome) == item["nome"].lower(),
-                ).first()
+        except (
+            ValueError,
+            TypeError
+        ):
 
-                if recurso:
-                    recurso.categoria = item["categoria"]
-                    recurso.unidade = "un"
-                    recurso.descricao = item.get("descricao", "")
-                    recurso.ativo = True
-                    recurso.estoque_atual = float(recurso.estoque_atual or 0) + quantidade
-                    atualizados += 1
-                else:
-                    db.session.add(Ferramenta(
-                        empresa_id=empresa.id,
-                        categoria=item["categoria"],
-                        nome=item["nome"],
-                        descricao=item.get("descricao", ""),
-                        unidade="un",
-                        estoque_minimo=0,
-                        estoque_atual=quantidade,
-                        ativo=True,
-                    ))
-                    criados += 1
+            flash(
+                "Os valores de estoque são inválidos.",
+                "danger"
+            )
+
+            return render_template(
+                "ferramenta_form.html",
+                ferramenta=None,
+                titulo="Nova ferramenta"
+            )
+
+        if estoque_minimo < 0:
+            estoque_minimo = 0
+
+        if estoque_atual < 0:
+            estoque_atual = 0
+
+        if not categoria or not nome:
+
+            flash(
+                "Categoria e nome são obrigatórios.",
+                "danger"
+            )
+
+            return render_template(
+                "ferramenta_form.html",
+                ferramenta=None,
+                titulo="Nova ferramenta"
+            )
+
+        ferramenta = Ferramenta(
+            empresa_id=current_user.empresa_id,
+            categoria=categoria,
+            nome=nome,
+            descricao=descricao,
+            unidade=unidade,
+            estoque_minimo=estoque_minimo,
+            estoque_atual=estoque_atual,
+            ativo=True,
+        )
+
+        db.session.add(ferramenta)
+
+        try:
 
             db.session.commit()
-            flash(f"{criados + atualizados} ferramenta(s) processada(s). Quantidades atualizadas.", "success")
-            return redirect(url_for("ferramentas"))
+
         except Exception:
+
             db.session.rollback()
-            logging.exception("ERRO AO CADASTRAR FERRAMENTAS EM LOTE: selecionados=%s", request.form.getlist("recursos"))
-            flash("Não foi possível cadastrar as ferramentas. O erro foi registrado no servidor.", "danger")
-            return redirect(url_for("nova_ferramenta"))
+
+            logging.exception(
+                "Erro ao cadastrar ferramenta"
+            )
+
+            flash(
+                "Não foi possível cadastrar a ferramenta.",
+                "danger"
+            )
+
+            return render_template(
+                "ferramenta_form.html",
+                ferramenta=None,
+                titulo="Nova ferramenta"
+            )
+
+        flash(
+            "Ferramenta cadastrada com sucesso.",
+            "success"
+        )
+
+        return redirect(
+            url_for("ferramentas")
+        )
 
     return render_template(
         "ferramenta_form.html",
         ferramenta=None,
-        titulo="Adicionar ferramentas",
-        modo_lote=True,
+        titulo="Nova ferramenta"
     )
 
 
