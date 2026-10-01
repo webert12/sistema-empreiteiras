@@ -41,10 +41,19 @@ app.config["SECRET_KEY"] = os.getenv(
 database_url = os.getenv("DATABASE_URL")
 
 if database_url:
+    # Render pode fornecer DATABASE_URL como postgres:// ou postgresql://.
+    # O projeto usa Psycopg 3; portanto, informamos explicitamente o driver
+    # para impedir que SQLAlchemy tente carregar o antigo psycopg2.
     if database_url.startswith("postgres://"):
         database_url = database_url.replace(
             "postgres://",
+            "postgresql+psycopg://",
+            1
+        )
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace(
             "postgresql://",
+            "postgresql+psycopg://",
             1
         )
 
