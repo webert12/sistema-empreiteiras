@@ -93,6 +93,12 @@ STATUS_SOLICITACAO = {
     "cancelado": "Cancelado",
 }
 
+TIPOS_SOLICITACAO = {
+    "material": "Material",
+    "ferramenta": "Ferramenta",
+    "outro": "Outro",
+}
+
 FUNCOES_OPERACIONAIS = {
     "mestre_obra",
     "pedreiro",
@@ -208,6 +214,14 @@ def eh_gestor_empresa():
     )
 
 
+def eh_compras():
+
+    return (
+        eh_administrador_empresa()
+        or funcao_atual() in FUNCOES_COMPRAS
+    )
+
+
 def empresa_usuario_atual():
 
     if not current_user.is_authenticated:
@@ -252,7 +266,7 @@ def usuario_tem_acesso_obra(usuario, obra):
         return False
 
     if usuario.funcao == "adm":
-        return True
+        return False
 
     if usuario.funcao in (
         "administrador_empresa",
@@ -281,9 +295,7 @@ def obras_do_usuario(usuario=None):
 
     if usuario.funcao == "adm":
 
-        return Obra.query.order_by(
-            Obra.criado_em.desc()
-        ).all()
+        return []
 
     if usuario.funcao in (
         "administrador_empresa",
@@ -321,7 +333,7 @@ def usuario_pode_gerenciar_obra(obra):
         return False
 
     if eh_administrador():
-        return True
+        return False
 
     if eh_administrador_empresa():
 
@@ -442,8 +454,8 @@ def empresa_acesso_obrigatorio(func):
         if eh_administrador():
 
             flash(
-                "O ADM geral possui somente acesso "
-                "de monitoramento das empreiteiras.",
+                "O ADM geral possui somente acesso administrativo "
+                "ao cadastro das empreiteiras.",
                 "warning"
             )
 
@@ -1087,6 +1099,17 @@ class Solicitacao(db.Model):
         nullable=False
     )
 
+    tipo_recurso = db.Column(
+        db.String(30),
+        nullable=False,
+        default="material"
+    )
+
+    recurso_nome = db.Column(
+        db.String(200),
+        nullable=True
+    )
+
     criado_em = db.Column(
         db.DateTime,
         default=datetime.utcnow
@@ -1111,6 +1134,133 @@ class Solicitacao(db.Model):
         ),
         lazy=True
     )
+
+
+# ============================================================
+# INICIALIZAÇÃO E COMPATIBILIDADE DO BANCO
+# ============================================================
+
+_db_init_lock = threading.Lock()
+_db_initialized = False
+
+
+def _coluna_existe(inspector, tabela, coluna):
+
+    try:
+        return any(
+            item["name"] == coluna
+            for item in inspector.get_columns(tabela)
+        )
+    except Exception:
+        return False
+
+
+def inicializar_banco():
+    """Cria as tabelas e adiciona colunas novas sem apagar dados existentes."""
+
+    db.create_all()
+
+    inspector = inspect(db.engine)
+
+    alteracoes = {
+        "materiais": {
+            "empresa_id": "INTEGER",
+        },
+        "ferramentas": {
+            "empresa_id": "INTEGER",
+        },
+        "solicitacoes": {
+            "material_id": "INTEGER",
+            "ferramenta_id": "INTEGER",
+            "tipo_recurso": "VARCHAR(30) DEFAULT 'material'",
+            "recurso_nome": "VARCHAR(200)",
+            "confirmado_por_id": "INTEGER",
+            "confirmado_em": "TIMESTAMP",
+        },
+    }
+
+    for tabela, colunas in alteracoes.items():
+
+        if tabela not in inspector.get_table_names():
+            continue
+
+        for coluna, definicao in colunas.items():
+
+            if _coluna_existe(inspector, tabela, coluna):
+                continue
+
+            sql = (
+                f"ALTER TABLE {tabela} "
+                f"ADD COLUMN {coluna} {definicao}"
+            )
+
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(text(sql))
+
+            except Exception:
+                logging.exception(
+                    "Falha ao adicionar coluna %s.%s",
+                    tabela,
+                    coluna,
+                )
+                raise
+
+            inspector = inspect(db.engine)
+
+    # Garante valor válido para registros antigos.
+    if "solicitacoes" in inspector.get_table_names():
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE solicitacoes "
+                        "SET tipo_recurso = 'material' "
+                        "WHERE tipo_recurso IS NULL "
+                        "OR tipo_recurso = ''"
+                    )
+                )
+        except Exception:
+            logging.exception(
+                "Falha ao normalizar tipo_recurso das solicitações"
+            )
+            raise
+
+
+@app.before_request
+def garantir_banco_inicializado():
+
+    global _db_initialized
+
+    if _db_initialized:
+        return None
+
+    with _db_init_lock:
+
+        if _db_initialized:
+            return None
+
+        try:
+            inicializar_banco()
+            _db_initialized = True
+
+            logging.info(
+                "Banco de dados inicializado com sucesso."
+            )
+
+        except Exception:
+
+            logging.exception(
+                "Não foi possível inicializar o banco de dados."
+            )
+
+            return (
+                "Banco de dados indisponível. "
+                "Verifique os logs do serviço.",
+                503,
+            )
+
+    return None
 
 
 # ============================================================
@@ -1293,22 +1443,6 @@ def login():
     )
 
 
-@app.route("/logout")
-@login_obrigatorio
-def logout():
-
-    logout_user()
-
-    flash(
-        "Você saiu do sistema.",
-        "success"
-    )
-
-    return redirect(
-        url_for("login")
-    )
-
-
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -1418,7 +1552,7 @@ def admin_dashboard():
 
 
 # ============================================================
-# EMPRESAS - ADM GERAL
+# EMPRESAS — SOMENTE CADASTRO DA PLATAFORMA
 # ============================================================
 
 @app.route(
@@ -1431,13 +1565,11 @@ def nova_empresa():
     if request.method == "POST":
 
         razao_social = (
-            request.form.get("razao_social")
-            or ""
+            request.form.get("razao_social") or ""
         ).strip()
 
         nome_fantasia = (
-            request.form.get("nome_fantasia")
-            or ""
+            request.form.get("nome_fantasia") or ""
         ).strip()
 
         cnpj = normalizar_cnpj(
@@ -1445,24 +1577,34 @@ def nova_empresa():
         )
 
         telefone = (
-            request.form.get("telefone")
-            or ""
+            request.form.get("telefone") or ""
         ).strip()
 
         email = (
-            request.form.get("email")
-            or ""
+            request.form.get("email") or ""
         ).strip()
 
         endereco = (
-            request.form.get("endereco")
-            or ""
+            request.form.get("endereco") or ""
         ).strip()
 
         if not razao_social or not nome_fantasia:
 
             flash(
                 "Razão social e nome fantasia são obrigatórios.",
+                "danger"
+            )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=None,
+                titulo="Nova empresa"
+            )
+
+        if cnpj and Empresa.query.filter_by(cnpj=cnpj).first():
+
+            flash(
+                "Já existe uma empresa com este CNPJ.",
                 "danger"
             )
 
@@ -1488,26 +1630,32 @@ def nova_empresa():
 
             db.session.commit()
 
-            flash(
-                "Empresa cadastrada com sucesso.",
-                "success"
-            )
-
-            return redirect(
-                url_for(
-                    "monitorar_empresa",
-                    empresa_id=empresa.id
-                )
-            )
-
         except IntegrityError:
 
             db.session.rollback()
 
             flash(
-                "Já existe uma empresa com este CNPJ.",
+                "Não foi possível cadastrar a empresa. Verifique os dados.",
                 "danger"
             )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=None,
+                titulo="Nova empresa"
+            )
+
+        flash(
+            "Empresa cadastrada com sucesso. Agora cadastre o ADM responsável.",
+            "success"
+        )
+
+        return redirect(
+            url_for(
+                "novo_administrador_empresa",
+                empresa_id=empresa.id
+            )
+        )
 
     return render_template(
         "empresa_form.html",
@@ -1531,6 +1679,7 @@ def empresa_detalhes(empresa_id):
 @app.route("/admin/empresas/<int:empresa_id>/monitoramento")
 @admin_obrigatorio
 def monitorar_empresa(empresa_id):
+    """Tela cadastral da empresa. Nunca exibe dados operacionais."""
 
     empresa = db.session.get(
         Empresa,
@@ -1548,52 +1697,20 @@ def monitorar_empresa(empresa_id):
             url_for("admin_dashboard")
         )
 
-    obras = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Obra.criado_em.desc()
-    ).all()
-
-    usuarios = Usuario.query.filter_by(
-        empresa_id=empresa.id
+    administradores = Usuario.query.filter(
+        Usuario.empresa_id == empresa.id,
+        Usuario.funcao.in_([
+            "administrador_empresa",
+            "admin_empresa",
+        ])
     ).order_by(
         Usuario.nome.asc()
     ).all()
 
-    materiais = Material.query.filter_by(
-        empresa_id=empresa.id,
-        ativo=True
-    ).order_by(
-        Material.nome.asc()
-    ).all()
-
-    ferramentas = Ferramenta.query.filter_by(
-        empresa_id=empresa.id,
-        ativo=True
-    ).order_by(
-        Ferramenta.nome.asc()
-    ).all()
-
-    solicitacoes = (
-        Solicitacao.query
-        .join(Obra)
-        .filter(
-            Obra.empresa_id == empresa.id
-        )
-        .order_by(
-            Solicitacao.criado_em.desc()
-        )
-        .all()
-    )
-
     return render_template(
         "empresa_monitoramento.html",
         empresa=empresa,
-        obras=obras,
-        usuarios=usuarios,
-        materiais=materiais,
-        ferramentas=ferramentas,
-        solicitacoes=solicitacoes,
+        administradores=administradores,
     )
 
 
@@ -1604,16 +1721,122 @@ def monitorar_empresa(empresa_id):
 @admin_obrigatorio
 def editar_empresa(empresa_id):
 
-    flash(
-        "O ADM Geral possui somente acesso ao monitoramento da empreiteira.",
-        "warning"
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
     )
 
-    return redirect(
-        url_for(
-            "monitorar_empresa",
-            empresa_id=empresa_id
+    if not empresa:
+
+        flash(
+            "Empreiteira não encontrada.",
+            "danger"
         )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    if request.method == "POST":
+
+        razao_social = (
+            request.form.get("razao_social") or ""
+        ).strip()
+
+        nome_fantasia = (
+            request.form.get("nome_fantasia") or ""
+        ).strip()
+
+        cnpj = normalizar_cnpj(
+            request.form.get("cnpj")
+        )
+
+        telefone = (
+            request.form.get("telefone") or ""
+        ).strip()
+
+        email = (
+            request.form.get("email") or ""
+        ).strip()
+
+        endereco = (
+            request.form.get("endereco") or ""
+        ).strip()
+
+        if not razao_social or not nome_fantasia:
+
+            flash(
+                "Razão social e nome fantasia são obrigatórios.",
+                "danger"
+            )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=empresa,
+                titulo="Editar empresa"
+            )
+
+        duplicada = Empresa.query.filter(
+            Empresa.cnpj == cnpj,
+            Empresa.id != empresa.id,
+            Empresa.cnpj.isnot(None),
+        ).first() if cnpj else None
+
+        if duplicada:
+
+            flash(
+                "Já existe outra empresa com este CNPJ.",
+                "danger"
+            )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=empresa,
+                titulo="Editar empresa"
+            )
+
+        empresa.razao_social = razao_social
+        empresa.nome_fantasia = nome_fantasia
+        empresa.cnpj = cnpj or None
+        empresa.telefone = telefone
+        empresa.email = email
+        empresa.endereco = endereco
+
+        try:
+
+            db.session.commit()
+
+        except IntegrityError:
+
+            db.session.rollback()
+
+            flash(
+                "Não foi possível atualizar a empresa.",
+                "danger"
+            )
+
+            return render_template(
+                "empresa_form.html",
+                empresa=empresa,
+                titulo="Editar empresa"
+            )
+
+        flash(
+            "Dados da empreiteira atualizados com sucesso.",
+            "success"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa.id
+            )
+        )
+
+    return render_template(
+        "empresa_form.html",
+        empresa=empresa,
+        titulo="Editar empresa"
     )
 
 
@@ -1624,15 +1847,59 @@ def editar_empresa(empresa_id):
 @admin_obrigatorio
 def alternar_status_empresa(empresa_id):
 
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
+    )
+
+    if not empresa:
+
+        flash(
+            "Empreiteira não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    empresa.ativo = not empresa.ativo
+
+    try:
+
+        db.session.commit()
+
+    except Exception:
+
+        db.session.rollback()
+
+        logging.exception(
+            "Erro ao alterar status da empresa"
+        )
+
+        flash(
+            "Não foi possível alterar o status da empresa.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa.id
+            )
+        )
+
     flash(
-        "O ADM Geral não possui acesso às configurações da empreiteira.",
-        "warning"
+        "Empreiteira ativada com sucesso."
+        if empresa.ativo
+        else "Empreiteira bloqueada com sucesso.",
+        "success"
     )
 
     return redirect(
         url_for(
             "monitorar_empresa",
-            empresa_id=empresa_id
+            empresa_id=empresa.id
         )
     )
 
@@ -1644,18 +1911,115 @@ def alternar_status_empresa(empresa_id):
 @admin_obrigatorio
 def excluir_empresa(empresa_id):
 
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
+    )
+
+    if not empresa:
+
+        flash(
+            "Empreiteira não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    try:
+
+        # Remove primeiro os registros dependentes para evitar
+        # conflitos de chave estrangeira em PostgreSQL/SQLite.
+        obras = Obra.query.filter_by(
+            empresa_id=empresa.id
+        ).all()
+
+        obra_ids = [obra.id for obra in obras]
+
+        if obra_ids:
+
+            Solicitacao.query.filter(
+                Solicitacao.obra_id.in_(obra_ids)
+            ).delete(
+                synchronize_session=False
+            )
+
+            UsuarioObra.query.filter(
+                UsuarioObra.obra_id.in_(obra_ids)
+            ).delete(
+                synchronize_session=False
+            )
+
+        UsuarioObra.query.filter(
+            UsuarioObra.usuario_id.in_(
+                db.session.query(Usuario.id).filter(
+                    Usuario.empresa_id == empresa.id
+                )
+            )
+        ).delete(
+            synchronize_session=False
+        )
+
+        Usuario.query.filter_by(
+            empresa_id=empresa.id
+        ).delete(
+            synchronize_session=False
+        )
+
+        Obra.query.filter_by(
+            empresa_id=empresa.id
+        ).delete(
+            synchronize_session=False
+        )
+
+        Material.query.filter_by(
+            empresa_id=empresa.id
+        ).delete(
+            synchronize_session=False
+        )
+
+        Ferramenta.query.filter_by(
+            empresa_id=empresa.id
+        ).delete(
+            synchronize_session=False
+        )
+
+        db.session.delete(empresa)
+        db.session.commit()
+
+    except Exception:
+
+        db.session.rollback()
+
+        logging.exception(
+            "Erro ao excluir empreiteira %s",
+            empresa_id
+        )
+
+        flash(
+            "Não foi possível excluir a empreiteira. "
+            "Verifique se existem registros dependentes.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
     flash(
-        "O ADM Geral não possui permissão para excluir empreiteiras.",
-        "warning"
+        "Empreiteira excluída com sucesso.",
+        "success"
     )
 
     return redirect(
-        url_for(
-            "monitorar_empresa",
-            empresa_id=empresa_id
-        )
+        url_for("admin_dashboard")
     )
 
+
+# ============================================================
+# ADMINISTRADORES DA EMPREITEIRA — SOMENTE ADM GERAL
+# ============================================================
 
 @app.route(
     "/admin/empresas/<int:empresa_id>/administrador/novo",
@@ -1664,16 +2028,119 @@ def excluir_empresa(empresa_id):
 @admin_obrigatorio
 def novo_administrador_empresa(empresa_id):
 
-    flash(
-        "O gerenciamento do ADM da empreiteira pertence ao ambiente da empresa.",
-        "warning"
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
     )
 
-    return redirect(
-        url_for(
-            "monitorar_empresa",
-            empresa_id=empresa_id
+    if not empresa:
+
+        flash(
+            "Empreiteira não encontrada.",
+            "danger"
         )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    if request.method == "POST":
+
+        nome = (
+            request.form.get("nome") or ""
+        ).strip()
+
+        usuario_login = normalizar_usuario(
+            request.form.get("usuario")
+        )
+
+        senha = (
+            request.form.get("senha") or ""
+        ).strip()
+
+        if not nome or not usuario_login or not senha:
+
+            flash(
+                "Nome, usuário e senha são obrigatórios.",
+                "danger"
+            )
+
+            return render_template(
+                "administrador_empresa_form.html",
+                empresa=empresa,
+                administrador=None,
+                titulo="Novo administrador"
+            )
+
+        if Usuario.query.filter_by(
+            usuario=usuario_login
+        ).first():
+
+            flash(
+                "Este nome de usuário já está em uso.",
+                "danger"
+            )
+
+            return render_template(
+                "administrador_empresa_form.html",
+                empresa=empresa,
+                administrador=None,
+                titulo="Novo administrador"
+            )
+
+        administrador = Usuario(
+            nome=nome,
+            usuario=usuario_login,
+            funcao="administrador_empresa",
+            ativo=True,
+            empresa_id=empresa.id,
+        )
+
+        administrador.definir_senha(senha)
+
+        db.session.add(administrador)
+
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao criar administrador da empreiteira"
+            )
+
+            flash(
+                "Não foi possível criar o administrador.",
+                "danger"
+            )
+
+            return render_template(
+                "administrador_empresa_form.html",
+                empresa=empresa,
+                administrador=None,
+                titulo="Novo administrador"
+            )
+
+        flash(
+            "Administrador da empreiteira criado com sucesso.",
+            "success"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa.id
+            )
+        )
+
+    return render_template(
+        "administrador_empresa_form.html",
+        empresa=empresa,
+        administrador=None,
+        titulo="Novo administrador"
     )
 
 
@@ -1687,9 +2154,215 @@ def editar_administrador_empresa(
     usuario_id
 ):
 
+    empresa = db.session.get(
+        Empresa,
+        empresa_id
+    )
+
+    administrador = db.session.get(
+        Usuario,
+        usuario_id
+    )
+
+    if not empresa or not administrador:
+
+        flash(
+            "Empresa ou administrador não encontrado.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    if (
+        administrador.empresa_id != empresa.id
+        or administrador.funcao not in {
+            "administrador_empresa",
+            "admin_empresa",
+        }
+    ):
+
+        flash(
+            "Este usuário não é administrador desta empreiteira.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa.id
+            )
+        )
+
+    if request.method == "POST":
+
+        nome = (
+            request.form.get("nome") or ""
+        ).strip()
+
+        usuario_login = normalizar_usuario(
+            request.form.get("usuario")
+        )
+
+        senha = (
+            request.form.get("senha") or ""
+        ).strip()
+
+        if not nome or not usuario_login:
+
+            flash(
+                "Nome e usuário são obrigatórios.",
+                "danger"
+            )
+
+            return render_template(
+                "administrador_empresa_form.html",
+                empresa=empresa,
+                administrador=administrador,
+                titulo="Editar administrador"
+            )
+
+        outro_usuario = Usuario.query.filter(
+            Usuario.usuario == usuario_login,
+            Usuario.id != administrador.id,
+        ).first()
+
+        if outro_usuario:
+
+            flash(
+                "Este nome de usuário já está em uso.",
+                "danger"
+            )
+
+            return render_template(
+                "administrador_empresa_form.html",
+                empresa=empresa,
+                administrador=administrador,
+                titulo="Editar administrador"
+            )
+
+        administrador.nome = nome
+        administrador.usuario = usuario_login
+
+        if senha:
+            administrador.definir_senha(senha)
+
+        # Checkbox marcado mantém ativo; ausência do checkbox bloqueia.
+        administrador.ativo = (
+            request.form.get("ativo") == "on"
+            or request.form.get("ativo") == "1"
+            or request.form.get("ativo") == "true"
+        )
+
+        try:
+
+            db.session.commit()
+
+        except Exception:
+
+            db.session.rollback()
+
+            logging.exception(
+                "Erro ao editar administrador da empreiteira"
+            )
+
+            flash(
+                "Não foi possível atualizar o administrador.",
+                "danger"
+            )
+
+            return render_template(
+                "administrador_empresa_form.html",
+                empresa=empresa,
+                administrador=administrador,
+                titulo="Editar administrador"
+            )
+
+        flash(
+            "Administrador atualizado com sucesso.",
+            "success"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa.id
+            )
+        )
+
+    return render_template(
+        "administrador_empresa_form.html",
+        empresa=empresa,
+        administrador=administrador,
+        titulo="Editar administrador"
+    )
+
+
+@app.route(
+    "/admin/empresas/<int:empresa_id>/administrador/<int:usuario_id>/alternar-status",
+    methods=["POST"]
+)
+@admin_obrigatorio
+def alternar_status_administrador_empresa(
+    empresa_id,
+    usuario_id
+):
+
+    administrador = Usuario.query.filter(
+        Usuario.id == usuario_id,
+        Usuario.empresa_id == empresa_id,
+        Usuario.funcao.in_([
+            "administrador_empresa",
+            "admin_empresa",
+        ])
+    ).first()
+
+    if not administrador:
+
+        flash(
+            "Administrador não encontrado.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa_id
+            )
+        )
+
+    administrador.ativo = not administrador.ativo
+
+    try:
+
+        db.session.commit()
+
+    except Exception:
+
+        db.session.rollback()
+
+        logging.exception(
+            "Erro ao alterar status do administrador"
+        )
+
+        flash(
+            "Não foi possível alterar o status do administrador.",
+            "danger"
+        )
+
+        return redirect(
+            url_for(
+                "monitorar_empresa",
+                empresa_id=empresa_id
+            )
+        )
+
     flash(
-        "O ADM Geral não possui acesso às configurações do ADM da empreiteira.",
-        "warning"
+        "Administrador ativado com sucesso."
+        if administrador.ativo
+        else "Administrador bloqueado com sucesso.",
+        "success"
     )
 
     return redirect(
@@ -1703,6 +2376,7 @@ def editar_administrador_empresa(
 # ============================================================
 # USUÁRIOS / FUNCIONÁRIOS
 # ============================================================
+
 
 @app.route(
     "/admin/empresas/<int:empresa_id>/usuarios/novo",
@@ -6171,9 +6845,7 @@ def ajustar_estoque_ferramenta(
 # PAINEL DA ADMINISTRAÇÃO DA EMPREITEIRA
 # ============================================================
 
-@app.route(
-    "/empresa/administracao"
-)
+@app.route("/empresa/administracao")
 @empresa_admin_obrigatorio
 def empresa_administracao():
 
@@ -6221,7 +6893,7 @@ def empresa_administracao():
         Obra.empresa_id == empresa.id,
         Solicitacao.status.in_([
             "pendente",
-            "comprado"
+            "comprado",
         ])
     ).count()
 
@@ -6237,985 +6909,6 @@ def empresa_administracao():
 
 
 # ============================================================
-# FUNCIONÁRIOS DA EMPREITEIRA
-# ============================================================
-
-@app.route("/funcionarios")
-@empresa_admin_obrigatorio
-def funcionarios():
-
-    empresa = empresa_usuario_atual()
-
-    usuarios = Usuario.query.filter(
-        Usuario.empresa_id == empresa.id,
-        Usuario.funcao != "adm"
-    ).order_by(
-        Usuario.nome.asc()
-    ).all()
-
-    obras = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Obra.nome.asc()
-    ).all()
-
-    return render_template(
-        "funcionarios.html",
-        funcionarios=usuarios,
-        obras=obras,
-        empresa=empresa,
-    )
-
-
-# ============================================================
-# NOVO FUNCIONÁRIO
-# ============================================================
-
-@app.route(
-    "/funcionarios/novo",
-    methods=["GET", "POST"]
-)
-@empresa_admin_obrigatorio
-def novo_funcionario():
-
-    empresa = empresa_usuario_atual()
-
-    return redirect(
-        url_for(
-            "novo_usuario_empresa",
-            empresa_id=empresa.id
-        )
-    )
-
-
-# ============================================================
-# EDITAR FUNCIONÁRIO
-# ============================================================
-
-@app.route(
-    "/funcionarios/<int:usuario_id>/editar",
-    methods=["GET", "POST"]
-)
-@empresa_admin_obrigatorio
-def editar_funcionario(
-    usuario_id
-):
-
-    funcionario = db.session.get(
-        Usuario,
-        usuario_id
-    )
-
-    if not funcionario:
-
-        flash(
-            "Funcionário não encontrado.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    if funcionario.empresa_id != current_user.empresa_id:
-
-        flash(
-            "Você não possui acesso a este funcionário.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    if funcionario.funcao == "adm":
-
-        flash(
-            "O ADM geral não pode ser editado nesta tela.",
-            "warning"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    empresa = empresa_usuario_atual()
-
-    obras = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Obra.nome.asc()
-    ).all()
-
-    vinculos = UsuarioObra.query.filter_by(
-        usuario_id=funcionario.id
-    ).all()
-
-    obras_selecionadas = {
-        vinculo.obra_id
-        for vinculo in vinculos
-    }
-
-    if request.method == "POST":
-
-        nome = (
-            request.form.get("nome")
-            or ""
-        ).strip()
-
-        usuario_login = normalizar_usuario(
-            request.form.get("usuario")
-        )
-
-        senha = request.form.get(
-            "senha",
-            ""
-        )
-
-        funcao = (
-            request.form.get("funcao")
-            or funcionario.funcao
-        ).strip()
-
-        if funcao not in FUNCOES_FUNCIONARIOS:
-
-            funcao = funcionario.funcao
-
-        if not nome or not usuario_login:
-
-            flash(
-                "Nome e usuário são obrigatórios.",
-                "danger"
-            )
-
-            return render_template(
-                "funcionario_form.html",
-                funcionario=funcionario,
-                empresa=empresa,
-                obras=obras,
-                obras_selecionadas=obras_selecionadas,
-                funcoes=FUNCOES_FUNCIONARIOS,
-                titulo="Editar funcionário"
-            )
-
-        outro_usuario = Usuario.query.filter(
-            Usuario.usuario == usuario_login,
-            Usuario.id != funcionario.id
-        ).first()
-
-        if outro_usuario:
-
-            flash(
-                "Este nome de usuário já está em uso.",
-                "danger"
-            )
-
-            return render_template(
-                "funcionario_form.html",
-                funcionario=funcionario,
-                empresa=empresa,
-                obras=obras,
-                obras_selecionadas=obras_selecionadas,
-                funcoes=FUNCOES_FUNCIONARIOS,
-                titulo="Editar funcionário"
-            )
-
-        funcionario.nome = nome
-        funcionario.usuario = usuario_login
-        funcionario.funcao = funcao
-
-        if senha.strip():
-
-            funcionario.definir_senha(
-                senha.strip()
-            )
-
-        # Atualiza vínculos com obras.
-        UsuarioObra.query.filter_by(
-            usuario_id=funcionario.id
-        ).delete(
-            synchronize_session=False
-        )
-
-        obras_form = request.form.getlist(
-            "obras"
-        )
-
-        for obra_id_raw in obras_form:
-
-            try:
-                obra_id = int(
-                    obra_id_raw
-                )
-            except (
-                ValueError,
-                TypeError
-            ):
-                continue
-
-            obra = db.session.get(
-                Obra,
-                obra_id
-            )
-
-            if (
-                obra
-                and obra.empresa_id == empresa.id
-            ):
-
-                db.session.add(
-                    UsuarioObra(
-                        usuario_id=funcionario.id,
-                        obra_id=obra.id
-                    )
-                )
-
-        try:
-
-            db.session.commit()
-
-        except Exception:
-
-            db.session.rollback()
-
-            logging.exception(
-                "Erro ao editar funcionário"
-            )
-
-            flash(
-                "Não foi possível atualizar o funcionário.",
-                "danger"
-            )
-
-            return render_template(
-                "funcionario_form.html",
-                funcionario=funcionario,
-                empresa=empresa,
-                obras=obras,
-                obras_selecionadas=obras_selecionadas,
-                funcoes=FUNCOES_FUNCIONARIOS,
-                titulo="Editar funcionário"
-            )
-
-        flash(
-            "Funcionário atualizado com sucesso.",
-            "success"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    return render_template(
-        "funcionario_form.html",
-        funcionario=funcionario,
-        empresa=empresa,
-        obras=obras,
-        obras_selecionadas=obras_selecionadas,
-        funcoes=FUNCOES_FUNCIONARIOS,
-        titulo="Editar funcionário"
-    )
-
-
-# ============================================================
-# ATIVAR / DESATIVAR FUNCIONÁRIO
-# ============================================================
-
-@app.route(
-    "/funcionarios/<int:usuario_id>/alternar-status",
-    methods=["POST"]
-)
-@empresa_admin_obrigatorio
-def alternar_status_funcionario(
-    usuario_id
-):
-
-    funcionario = db.session.get(
-        Usuario,
-        usuario_id
-    )
-
-    if not funcionario:
-
-        flash(
-            "Funcionário não encontrado.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    if funcionario.empresa_id != current_user.empresa_id:
-
-        flash(
-            "Você não possui acesso a este funcionário.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    if funcionario.funcao == "adm":
-
-        flash(
-            "O ADM geral não pode ser alterado nesta tela.",
-            "warning"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    funcionario.ativo = not funcionario.ativo
-
-    try:
-
-        db.session.commit()
-
-    except Exception:
-
-        db.session.rollback()
-
-        logging.exception(
-            "Erro ao alterar status do funcionário"
-        )
-
-        flash(
-            "Não foi possível alterar o status.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("funcionarios")
-        )
-
-    flash(
-        "Status do funcionário atualizado.",
-        "success"
-    )
-
-    return redirect(
-        url_for("funcionarios")
-    )
-    # ============================================================
-# ADMINISTRAÇÃO GERAL — EMPREITEIRAS
-# ============================================================
-
-@app.route("/admin/empresas")
-@admin_obrigatorio
-def admin_empresas():
-
-    empresas = Empresa.query.order_by(
-        Empresa.nome_fantasia.asc()
-    ).all()
-
-    return render_template(
-        "admin_empresas.html",
-        empresas=empresas
-    )
-
-
-# ============================================================
-# MONITORAMENTO DA EMPREITEIRA
-# ============================================================
-
-@app.route(
-    "/admin/empresas/<int:empresa_id>/monitoramento"
-)
-@admin_obrigatorio
-def monitorar_empresa(
-    empresa_id
-):
-
-    empresa = db.session.get(
-        Empresa,
-        empresa_id
-    )
-
-    if not empresa:
-
-        flash(
-            "Empreiteira não encontrada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-    obras = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Obra.criado_em.desc()
-    ).all()
-
-    usuarios = Usuario.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Usuario.nome.asc()
-    ).all()
-
-    materiais = Material.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Material.nome.asc()
-    ).all()
-
-    ferramentas_lista = Ferramenta.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(
-        Ferramenta.nome.asc()
-    ).all()
-
-    solicitacoes = Solicitacao.query.join(
-        Obra,
-        Solicitacao.obra_id == Obra.id
-    ).filter(
-        Obra.empresa_id == empresa.id
-    ).order_by(
-        Solicitacao.criado_em.desc()
-    ).all()
-
-    return render_template(
-        "empresa_monitoramento.html",
-        empresa=empresa,
-        obras=obras,
-        usuarios=usuarios,
-        materiais=materiais,
-        ferramentas=ferramentas_lista,
-        solicitacoes=solicitacoes,
-    )
-
-
-# ============================================================
-# CRIAR ADM DA EMPREITEIRA
-# SOMENTE ADM GERAL
-# ============================================================
-
-@app.route(
-    "/admin/empresas/<int:empresa_id>/administrador/novo",
-    methods=["GET", "POST"]
-)
-@admin_obrigatorio
-def novo_administrador_empresa(
-    empresa_id
-):
-
-    empresa = db.session.get(
-        Empresa,
-        empresa_id
-    )
-
-    if not empresa:
-
-        flash(
-            "Empreiteira não encontrada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-    administrador = Usuario.query.filter_by(
-        empresa_id=empresa.id,
-        funcao="administrador_empresa"
-    ).first()
-
-    if administrador:
-
-        flash(
-            "Esta empreiteira já possui um administrador.",
-            "info"
-        )
-
-        return redirect(
-            url_for(
-                "editar_administrador_empresa",
-                empresa_id=empresa.id
-            )
-        )
-
-    if request.method == "POST":
-
-        nome = (
-            request.form.get("nome")
-            or ""
-        ).strip()
-
-        usuario_login = normalizar_usuario(
-            request.form.get("usuario")
-        )
-
-        senha = (
-            request.form.get("senha")
-            or ""
-        ).strip()
-
-        if not nome:
-
-            flash(
-                "Informe o nome do administrador.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=None,
-                titulo="Novo administrador"
-            )
-
-        if not usuario_login:
-
-            flash(
-                "Informe o nome de usuário.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=None,
-                titulo="Novo administrador"
-            )
-
-        if not senha:
-
-            flash(
-                "Informe uma senha.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=None,
-                titulo="Novo administrador"
-            )
-
-        usuario_existente = Usuario.query.filter_by(
-            usuario=usuario_login
-        ).first()
-
-        if usuario_existente:
-
-            flash(
-                "Este nome de usuário já está em uso.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=None,
-                titulo="Novo administrador"
-            )
-
-        administrador = Usuario(
-            nome=nome,
-            usuario=usuario_login,
-            funcao="administrador_empresa",
-            ativo=True,
-            empresa_id=empresa.id,
-        )
-
-        administrador.definir_senha(
-            senha
-        )
-
-        db.session.add(
-            administrador
-        )
-
-        try:
-
-            db.session.commit()
-
-        except Exception:
-
-            db.session.rollback()
-
-            logging.exception(
-                "Erro ao criar administrador da empreiteira"
-            )
-
-            flash(
-                "Não foi possível criar o administrador.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=None,
-                titulo="Novo administrador"
-            )
-
-        flash(
-            "Administrador da empreiteira criado com sucesso.",
-            "success"
-        )
-
-        return redirect(
-            url_for(
-                "empresa_detalhes",
-                empresa_id=empresa.id
-            )
-        )
-
-    return render_template(
-        "administrador_empresa_form.html",
-        empresa=empresa,
-        administrador=None,
-        titulo="Novo administrador"
-    )
-
-
-# ============================================================
-# EDITAR ADM DA EMPREITEIRA
-# SOMENTE ADM GERAL
-# ============================================================
-
-@app.route(
-    "/admin/empresas/<int:empresa_id>/administrador/editar",
-    methods=["GET", "POST"]
-)
-@admin_obrigatorio
-def editar_administrador_empresa(
-    empresa_id
-):
-
-    empresa = db.session.get(
-        Empresa,
-        empresa_id
-    )
-
-    if not empresa:
-
-        flash(
-            "Empreiteira não encontrada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-    administrador = Usuario.query.filter_by(
-        empresa_id=empresa.id,
-        funcao="administrador_empresa"
-    ).first()
-
-    if not administrador:
-
-        flash(
-            "Esta empreiteira ainda não possui administrador.",
-            "warning"
-        )
-
-        return redirect(
-            url_for(
-                "novo_administrador_empresa",
-                empresa_id=empresa.id
-            )
-        )
-
-    if request.method == "POST":
-
-        nome = (
-            request.form.get("nome")
-            or ""
-        ).strip()
-
-        usuario_login = normalizar_usuario(
-            request.form.get("usuario")
-        )
-
-        senha = (
-            request.form.get("senha")
-            or ""
-        ).strip()
-
-        if not nome or not usuario_login:
-
-            flash(
-                "Nome e usuário são obrigatórios.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=administrador,
-                titulo="Editar administrador"
-            )
-
-        outro_usuario = Usuario.query.filter(
-            Usuario.usuario == usuario_login,
-            Usuario.id != administrador.id
-        ).first()
-
-        if outro_usuario:
-
-            flash(
-                "Este nome de usuário já está em uso.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=administrador,
-                titulo="Editar administrador"
-            )
-
-        administrador.nome = nome
-        administrador.usuario = usuario_login
-
-        if senha:
-
-            administrador.definir_senha(
-                senha
-            )
-
-        administrador.ativo = (
-            request.form.get("ativo") == "on"
-        )
-
-        try:
-
-            db.session.commit()
-
-        except Exception:
-
-            db.session.rollback()
-
-            logging.exception(
-                "Erro ao editar administrador da empreiteira"
-            )
-
-            flash(
-                "Não foi possível atualizar o administrador.",
-                "danger"
-            )
-
-            return render_template(
-                "administrador_empresa_form.html",
-                empresa=empresa,
-                administrador=administrador,
-                titulo="Editar administrador"
-            )
-
-        flash(
-            "Administrador atualizado com sucesso.",
-            "success"
-        )
-
-        return redirect(
-            url_for(
-                "empresa_detalhes",
-                empresa_id=empresa.id
-            )
-        )
-
-    return render_template(
-        "administrador_empresa_form.html",
-        empresa=empresa,
-        administrador=administrador,
-        titulo="Editar administrador"
-    )
-
-
-# ============================================================
-# ATIVAR / BLOQUEAR ADM DA EMPREITEIRA
-# ============================================================
-
-@app.route(
-    "/admin/empresas/<int:empresa_id>/administrador/status",
-    methods=["POST"]
-)
-@admin_obrigatorio
-def alternar_status_administrador_empresa(
-    empresa_id
-):
-
-    empresa = db.session.get(
-        Empresa,
-        empresa_id
-    )
-
-    if not empresa:
-
-        flash(
-            "Empreiteira não encontrada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-    administrador = Usuario.query.filter_by(
-        empresa_id=empresa.id,
-        funcao="administrador_empresa"
-    ).first()
-
-    if not administrador:
-
-        flash(
-            "Administrador não encontrado.",
-            "warning"
-        )
-
-        return redirect(
-            url_for(
-                "empresa_detalhes",
-                empresa_id=empresa.id
-            )
-        )
-
-    administrador.ativo = not administrador.ativo
-
-    try:
-
-        db.session.commit()
-
-    except Exception:
-
-        db.session.rollback()
-
-        logging.exception(
-            "Erro ao alterar status do administrador"
-        )
-
-        flash(
-            "Não foi possível alterar o status.",
-            "danger"
-        )
-
-        return redirect(
-            url_for(
-                "empresa_detalhes",
-                empresa_id=empresa.id
-            )
-        )
-
-    if administrador.ativo:
-
-        mensagem = (
-            "Administrador da empreiteira desbloqueado."
-        )
-
-    else:
-
-        mensagem = (
-            "Administrador da empreiteira bloqueado."
-        )
-
-    flash(
-        mensagem,
-        "success"
-    )
-
-    return redirect(
-        url_for(
-            "empresa_detalhes",
-            empresa_id=empresa.id
-        )
-    )
-
-
-# ============================================================
-# VISÃO RESUMIDA DA EMPREITEIRA PARA O ADM GERAL
-# ============================================================
-
-@app.route(
-    "/admin/empresas/<int:empresa_id>/resumo"
-)
-@admin_obrigatorio
-def resumo_empresa_admin(
-    empresa_id
-):
-
-    empresa = db.session.get(
-        Empresa,
-        empresa_id
-    )
-
-    if not empresa:
-
-        flash(
-            "Empreiteira não encontrada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("admin_dashboard")
-        )
-
-    total_usuarios = Usuario.query.filter_by(
-        empresa_id=empresa.id
-    ).count()
-
-    total_obras = Obra.query.filter_by(
-        empresa_id=empresa.id
-    ).count()
-
-    total_materiais = Material.query.filter_by(
-        empresa_id=empresa.id,
-        ativo=True
-    ).count()
-
-    total_ferramentas = Ferramenta.query.filter_by(
-        empresa_id=empresa.id,
-        ativo=True
-    ).count()
-
-    total_pendentes = Solicitacao.query.join(
-        Obra,
-        Solicitacao.obra_id == Obra.id
-    ).filter(
-        Obra.empresa_id == empresa.id,
-        Solicitacao.status == "pendente"
-    ).count()
-
-    total_comprados = Solicitacao.query.join(
-        Obra,
-        Solicitacao.obra_id == Obra.id
-    ).filter(
-        Obra.empresa_id == empresa.id,
-        Solicitacao.status == "comprado"
-    ).count()
-
-    total_confirmados = Solicitacao.query.join(
-        Obra,
-        Solicitacao.obra_id == Obra.id
-    ).filter(
-        Obra.empresa_id == empresa.id,
-        Solicitacao.status == "confirmado"
-    ).count()
-
-    administrador = Usuario.query.filter_by(
-        empresa_id=empresa.id,
-        funcao="administrador_empresa"
-    ).first()
-
-    return render_template(
-        "empresa_resumo.html",
-        empresa=empresa,
-        administrador=administrador,
-        total_usuarios=total_usuarios,
-        total_obras=total_obras,
-        total_materiais=total_materiais,
-        total_ferramentas=total_ferramentas,
-        total_pendentes=total_pendentes,
-        total_comprados=total_comprados,
-        total_confirmados=total_confirmados,
-    )
-    # ============================================================
 # COMPATIBILIDADE — PAINEL ADM
 # ============================================================
 
@@ -7236,13 +6929,13 @@ def admin_alias():
 # ============================================================
 
 @app.route("/logout")
-@login_required
+@login_obrigatorio
 def logout():
 
     logout_user()
 
     flash(
-        "Sessão encerrada com sucesso.",
+        "Você saiu do sistema.",
         "success"
     )
 
