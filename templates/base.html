@@ -24,7 +24,7 @@
           <li class="nav-item"><a class="nav-link" href="{{ url_for('obras') }}">Obras</a></li>
           {% if eh_adm_empresa %}<li class="nav-item"><a class="nav-link" href="{{ url_for('funcionarios') }}">Funcionários</a></li>{% endif %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('solicitacoes') }}">Solicitações</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('estoque') }}">Estoque</a></li>
+          {% if eh_estoque %}<li class="nav-item"><a class="nav-link" href="{{ url_for('estoque') }}">Estoque</a></li>{% endif %}
           {% if eh_gestor %}<li class="nav-item"><a class="nav-link" href="{{ url_for('materiais') }}">Materiais</a></li><li class="nav-item"><a class="nav-link" href="{{ url_for('ferramentas') }}">Ferramentas</a></li>{% endif %}
           {% if eh_adm_empresa %}<li class="nav-item"><a class="nav-link" href="{{ url_for('empresa_administracao') }}">Administração</a></li>{% endif %}
         {% endif %}

@@ -1,1 +1,184 @@
-{% extends 'base.html' %}{% block title %}Nova solicitação{% endblock %}{% block content %}<div class="page-head"><div><h1 class="h3">Nova solicitação</h1><p class="text-muted">A solicitação ficará pendente até a compra e confirmação.</p></div><a class="btn btn-outline-secondary" href="{{ url_for('solicitacoes') }}">Voltar</a></div><div class="card shadow-sm form-card"><div class="card-body"><form method="post"><div class="row g-3"><div class="col-md-6"><label class="form-label">Obra *</label><select class="form-select" name="obra_id" required><option value="">Selecione</option>{% for obra in obras %}<option value="{{ obra.id }}">{{ obra.nome }}</option>{% endfor %}</select></div><div class="col-md-6"><label class="form-label">Tipo *</label><select class="form-select" name="tipo" id="tipoRecurso"><option value="material">Material</option><option value="ferramenta">Ferramenta</option><option value="outro">Outro</option></select></div><div class="col-12" id="blocoCatalogo"><label class="form-label">Recurso *</label><select class="form-select" name="recurso_id" id="recursoId"><option value="">Selecione</option>{% for m in materiais %}<option data-tipo="material" value="{{ m.id }}">{{ m.nome }} · {{ m.categoria }} · {{ m.unidade }}</option>{% endfor %}{% for f in ferramentas %}<option data-tipo="ferramenta" value="{{ f.id }}">{{ f.nome }} · {{ f.categoria }} · {{ f.unidade }}</option>{% endfor %}</select></div><div class="col-12 d-none" id="blocoOutro"><label class="form-label">Nome do recurso *</label><input class="form-control" name="recurso_nome"></div><div class="col-md-4"><label class="form-label">Quantidade *</label><input type="number" min="0.01" step="0.01" class="form-control" name="quantidade" required></div><div class="col-12"><label class="form-label">Observação</label><textarea class="form-control" rows="4" name="observacao"></textarea></div></div><button class="btn btn-primary mt-4">Enviar solicitação</button></form></div></div>{% endblock %}{% block scripts %}<script>const tipo=document.getElementById('tipoRecurso'), bloco=document.getElementById('blocoCatalogo'), outro=document.getElementById('blocoOutro'), sel=document.getElementById('recursoId');function atualiza(){const v=tipo.value; bloco.classList.toggle('d-none',v==='outro'); outro.classList.toggle('d-none',v!=='outro'); [...sel.options].forEach((o,i)=>{if(i===0){o.hidden=false;return;}o.hidden=o.dataset.tipo!==v;});sel.value='';}tipo.addEventListener('change',atualiza);atualiza();</script>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Nova solicitação{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h3 mb-1">Nova solicitação</h1>
+    <p class="text-muted mb-0">Escolha a obra, o tipo e marque um ou vários itens que precisam ser comprados. O estoque atual não limita esta lista.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('solicitacoes') }}">Voltar</a>
+</div>
+
+<form method="post" id="formSolicitacao">
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Obra *</label>
+          <select class="form-select form-select-lg" name="obra_id" required>
+            <option value="">Selecione a obra</option>
+            {% for obra in obras %}
+              <option value="{{ obra.id }}">{{ obra.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Tipo *</label>
+          <select class="form-select form-select-lg" name="tipo_recurso" id="tipoRecurso" required>
+            <option value="material">Material</option>
+            <option value="ferramenta">Ferramenta</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm" id="blocoCatalogo">
+    <div class="card-header bg-white py-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <h2 class="h5 mb-1" id="tituloRecursos">Materiais para comprar</h2>
+          <div class="small text-muted">Marque quantos itens quiser. O sistema criará uma solicitação separada para cada item marcado.</div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="marcarTodos">Marcar todos</button>
+      </div>
+      <div class="mt-3">
+        <input type="search" class="form-control" id="buscarRecurso" placeholder="Pesquisar material ou ferramenta...">
+      </div>
+    </div>
+
+    <div class="card-body">
+      <div id="listaMateriais" class="catalog-grid">
+        {% for item in catalogo_materiais %}
+        <div class="resource-card" data-tipo="material" data-search="{{ (item.nome ~ ' ' ~ item.categoria)|lower }}">
+          <div class="resource-main">
+            <input class="form-check-input recurso-check" type="checkbox" name="recursos" value="material:{{ loop.index0 }}" id="mat{{ loop.index0 }}">
+            <label class="resource-label" for="mat{{ loop.index0 }}">
+              <strong>{{ item.nome }}</strong>
+              <span>{{ item.categoria }} · {{ item.unidade }}</span>
+            </label>
+          </div>
+          <div class="resource-qty">
+            <label for="qmat{{ loop.index0 }}">Qtd.</label>
+            <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control form-control-sm quantidade-item" name="quantidade_material_{{ loop.index0 }}" id="qmat{{ loop.index0 }}" value="1" disabled>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div id="listaFerramentas" class="catalog-grid d-none">
+        {% for item in catalogo_ferramentas %}
+        <div class="resource-card" data-tipo="ferramenta" data-search="{{ (item.nome ~ ' ' ~ item.categoria)|lower }}">
+          <div class="resource-main">
+            <input class="form-check-input recurso-check" type="checkbox" name="recursos" value="ferramenta:{{ loop.index0 }}" id="fer{{ loop.index0 }}">
+            <label class="resource-label" for="fer{{ loop.index0 }}">
+              <strong>{{ item.nome }}</strong>
+              <span>{{ item.categoria }} · {{ item.unidade }}</span>
+            </label>
+          </div>
+          <div class="resource-qty">
+            <label for="qfer{{ loop.index0 }}">Qtd.</label>
+            <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control form-control-sm quantidade-item" name="quantidade_ferramenta_{{ loop.index0 }}" id="qfer{{ loop.index0 }}" value="1" disabled>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div id="semResultados" class="alert alert-light border d-none mt-3 mb-0">Nenhum item encontrado.</div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-3 d-none" id="blocoOutro">
+    <div class="card-body">
+      <label class="form-label fw-semibold">O que precisa ser comprado? *</label>
+      <input class="form-control" name="recurso_nome" placeholder="Ex.: serviço de caminhão, locação, peça específica">
+      <div class="row mt-2">
+        <div class="col-md-4">
+          <label class="form-label">Quantidade *</label>
+          <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control" name="quantidade" value="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <label class="form-label fw-semibold">Observação</label>
+      <textarea class="form-control" rows="3" name="observacao" placeholder="Ex.: usar na fundação da casa, entrega até sexta-feira..."></textarea>
+      <div class="d-flex flex-wrap gap-2 mt-4">
+        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send"></i> Enviar solicitação</button>
+        <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('solicitacoes') }}">Cancelar</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const tipo = document.getElementById('tipoRecurso');
+  const materiais = document.getElementById('listaMateriais');
+  const ferramentas = document.getElementById('listaFerramentas');
+  const outro = document.getElementById('blocoOutro');
+  const catalogo = document.getElementById('blocoCatalogo');
+  const busca = document.getElementById('buscarRecurso');
+  const marcarTodos = document.getElementById('marcarTodos');
+  const titulo = document.getElementById('tituloRecursos');
+  const sem = document.getElementById('semResultados');
+
+  function cardsAtuais(){
+    return [...document.querySelectorAll('.resource-card[data-tipo="'+tipo.value+'"]')];
+  }
+
+  function atualizar(){
+    const isOutro = tipo.value === 'outro';
+    catalogo.classList.toggle('d-none', isOutro);
+    outro.classList.toggle('d-none', !isOutro);
+    if(isOutro) return;
+    materiais.classList.toggle('d-none', tipo.value !== 'material');
+    ferramentas.classList.toggle('d-none', tipo.value !== 'ferramenta');
+    titulo.textContent = tipo.value === 'material' ? 'Materiais para comprar' : 'Ferramentas para comprar';
+    filtrar();
+  }
+
+  function filtrar(){
+    if(tipo.value === 'outro') return;
+    const termo = (busca.value || '').trim().toLowerCase();
+    const cards = cardsAtuais();
+    let visiveis = 0;
+    cards.forEach(card => {
+      const ok = !termo || card.dataset.search.includes(termo);
+      card.classList.toggle('d-none', !ok);
+      if(ok) visiveis++;
+    });
+    sem.classList.toggle('d-none', visiveis !== 0);
+  }
+
+  document.querySelectorAll('.recurso-check').forEach(check => {
+    check.addEventListener('change', () => {
+      const qty = check.closest('.resource-card').querySelector('.quantidade-item');
+      qty.disabled = !check.checked;
+      if(check.checked && (!qty.value || Number(qty.value) <= 0)) qty.value = '1';
+    });
+  });
+
+  marcarTodos.addEventListener('click', () => {
+    const cards = cardsAtuais().filter(card => !card.classList.contains('d-none'));
+    const marcar = cards.some(card => !card.querySelector('.recurso-check').checked);
+    cards.forEach(card => {
+      const check = card.querySelector('.recurso-check');
+      const qty = card.querySelector('.quantidade-item');
+      check.checked = marcar;
+      qty.disabled = !marcar;
+      if(marcar && (!qty.value || Number(qty.value) <= 0)) qty.value = '1';
+    });
+    marcarTodos.textContent = marcar ? 'Desmarcar todos' : 'Marcar todos';
+  });
+
+  busca.addEventListener('input', filtrar);
+  tipo.addEventListener('change', atualizar);
+  atualizar();
+})();
+</script>
+{% endblock %}
