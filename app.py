@@ -226,11 +226,20 @@ def eh_administrador_empresa():
     )
 
 
+def eh_mestre_obra():
+
+    return (
+        current_user.is_authenticated
+        and funcao_atual() == "mestre_obra"
+    )
+
+
 def eh_gestor_empresa():
 
     return (
         eh_administrador()
         or eh_administrador_empresa()
+        or eh_mestre_obra()
     )
 
 
@@ -238,6 +247,7 @@ def eh_compras():
 
     return (
         eh_administrador_empresa()
+        or eh_mestre_obra()
         or funcao_atual() in FUNCOES_COMPRAS
     )
 
@@ -320,6 +330,7 @@ def obras_do_usuario(usuario=None):
     if usuario.funcao in (
         "administrador_empresa",
         "admin_empresa",
+        "mestre_obra",
     ):
 
         return Obra.query.filter_by(
@@ -355,7 +366,10 @@ def usuario_pode_gerenciar_obra(obra):
     if eh_administrador():
         return False
 
-    if eh_administrador_empresa():
+    if (
+        eh_administrador_empresa()
+        or eh_mestre_obra()
+    ):
 
         return (
             current_user.empresa_id
@@ -368,6 +382,47 @@ def usuario_pode_gerenciar_obra(obra):
 # ============================================================
 # CONTROLE DE ACESSO DA EMPREITEIRA
 # ============================================================
+
+def gestao_empresa_obrigatorio(func):
+    """Acesso operacional amplo para ADM da empresa e Mestre de Obra.
+
+    O Mestre de Obra pode operar a empresa e acompanhar estoque,
+    funcionários, materiais, ferramentas, solicitações e obras, mas
+    não recebe acesso às configurações da empresa nem às ações
+    destrutivas/finais de obra.
+    """
+
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+
+        if not current_user.is_authenticated:
+            flash("Faça login para acessar esta página.", "warning")
+            return redirect(url_for("login"))
+
+        if not current_user.ativo:
+            logout_user()
+            flash("Seu usuário está inativo.", "danger")
+            return redirect(url_for("login"))
+
+        if eh_administrador():
+            flash("O ADM Geral não possui acesso operacional das empreiteiras.", "danger")
+            return redirect(url_for("admin_dashboard"))
+
+        if not (eh_administrador_empresa() or eh_mestre_obra()):
+            flash("Seu perfil não possui acesso a esta função.", "danger")
+            return redirect(url_for("dashboard"))
+
+        empresa = empresa_usuario_atual()
+
+        if not empresa or not empresa.ativo:
+            logout_user()
+            flash("A empreiteira está bloqueada ou não existe.", "danger")
+            return redirect(url_for("login"))
+
+        return func(*args, **kwargs)
+
+    return decorated_function
+
 
 def empresa_admin_obrigatorio(func):
 
@@ -512,6 +567,7 @@ def estoque_obrigatorio(func):
         if (
             funcao_atual() not in FUNCOES_ESTOQUE
             and not eh_administrador_empresa()
+            and not eh_mestre_obra()
         ):
 
             flash(
@@ -537,6 +593,7 @@ def compras_obrigatorio(func):
 
         if (
             not eh_administrador_empresa()
+            and not eh_mestre_obra()
             and funcao_atual() not in FUNCOES_COMPRAS
         ):
 
@@ -1403,7 +1460,8 @@ def injetar_contexto():
         "eh_adm": eh_administrador(),
         "eh_adm_empresa": eh_administrador_empresa(),
         "eh_gestor": eh_gestor_empresa(),
-        "eh_estoque": (funcao_atual() in FUNCOES_ESTOQUE) or eh_administrador_empresa(),
+        "eh_mestre": eh_mestre_obra(),
+        "eh_estoque": (funcao_atual() in FUNCOES_ESTOQUE) or eh_administrador_empresa() or eh_mestre_obra(),
         "empresa_atual": empresa,
         "funcoes_funcionarios": FUNCOES_FUNCIONARIOS,
         "status_obras": STATUS_OBRA,
@@ -2483,7 +2541,7 @@ def alternar_status_administrador_empresa(
     "/admin/empresas/<int:empresa_id>/usuarios/novo",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def novo_usuario_empresa(empresa_id):
 
     empresa = db.session.get(
@@ -2693,7 +2751,7 @@ def novo_usuario_empresa(empresa_id):
     "/funcionarios",
     methods=["GET"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def funcionarios():
 
     empresa = empresa_usuario_atual()
@@ -2727,7 +2785,7 @@ def funcionarios():
     "/funcionarios/novo",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def novo_funcionario():
 
     empresa = empresa_usuario_atual()
@@ -2755,7 +2813,7 @@ def novo_funcionario():
     "/funcionarios/<int:usuario_id>/editar",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def editar_funcionario(usuario_id):
 
     funcionario = db.session.get(
@@ -2997,7 +3055,7 @@ def editar_funcionario(usuario_id):
     "/funcionarios/<int:usuario_id>/alternar-status",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def alternar_status_funcionario(usuario_id):
 
     funcionario = db.session.get(
@@ -3055,6 +3113,59 @@ def alternar_status_funcionario(usuario_id):
     )
 
 
+@app.route(
+    "/funcionarios/<int:usuario_id>/excluir",
+    methods=["POST"]
+)
+@gestao_empresa_obrigatorio
+def excluir_funcionario(usuario_id):
+
+    funcionario = db.session.get(Usuario, usuario_id)
+
+    if not funcionario:
+        flash("Funcionário não encontrado.", "danger")
+        return redirect(url_for("funcionarios"))
+
+    if (
+        funcionario.empresa_id != current_user.empresa_id
+        or funcionario.funcao in {"adm", "administrador_empresa", "admin_empresa"}
+    ):
+        flash("Você não possui permissão para excluir este usuário.", "danger")
+        return redirect(url_for("funcionarios"))
+
+    # Não permita que o usuário exclua a própria conta.
+    if funcionario.id == current_user.id:
+        flash("Você não pode excluir a própria conta.", "warning")
+        return redirect(url_for("funcionarios"))
+
+    try:
+        UsuarioObra.query.filter_by(usuario_id=funcionario.id).delete(
+            synchronize_session=False
+        )
+
+        Solicitacao.query.filter_by(usuario_id=funcionario.id).update(
+            {"usuario_id": current_user.id},
+            synchronize_session=False
+        )
+
+        Solicitacao.query.filter_by(confirmado_por_id=funcionario.id).update(
+            {"confirmado_por_id": None},
+            synchronize_session=False
+        )
+
+        db.session.delete(funcionario)
+        db.session.commit()
+
+        flash("Funcionário excluído com sucesso.", "success")
+
+    except Exception:
+        db.session.rollback()
+        logging.exception("Erro ao excluir funcionário")
+        flash("Não foi possível excluir o funcionário.", "danger")
+
+    return redirect(url_for("funcionarios"))
+
+
 # ============================================================
 # OBRAS
 # ============================================================
@@ -3075,7 +3186,7 @@ def obras():
     "/obras/nova",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def nova_obra():
 
     empresa = empresa_usuario_atual()
@@ -3306,7 +3417,7 @@ def obra_detalhes(obra_id):
     "/obras/<int:obra_id>/editar",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def editar_obra(obra_id):
 
     obra = obter_obra(
@@ -3637,7 +3748,7 @@ def excluir_obra(obra_id):
     "/obras/<int:obra_id>/equipe",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def equipe_obra(obra_id):
 
     obra = obter_obra(
@@ -3823,7 +3934,7 @@ def equipe_obra(obra_id):
     "/obras/<int:obra_id>/equipe/<int:vinculo_id>/remover",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def remover_equipe_obra(
     obra_id,
     vinculo_id
@@ -4958,7 +5069,7 @@ def materiais():
     "/materiais/novo",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def novo_material():
 
     empresa = empresa_usuario_atual()
@@ -5098,7 +5209,7 @@ def novo_material():
     "/materiais/<int:material_id>/editar",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def editar_material(material_id):
 
     material = obter_material(
@@ -5246,7 +5357,7 @@ def editar_material(material_id):
     "/materiais/<int:material_id>/alternar-status",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def alternar_status_material(material_id):
 
     material = obter_material(
@@ -5353,11 +5464,11 @@ def solicitacoes():
 )
 @empresa_acesso_obrigatorio
 def nova_solicitacao():
-    """Cria uma ou várias solicitações de compra de uma só vez.
+    """Cria solicitações de compra usando o catálogo completo, sem consultar o estoque.
 
-    A tela usa os catálogos gerais de construção, e não o estoque atual.
-    Se um item ainda não existir no cadastro da empresa, ele é criado com
-    estoque zero para que a confirmação da compra possa alimentar o estoque.
+    Cada item marcado vira uma solicitação independente. O recurso é criado
+    no cadastro da empresa com estoque zero quando ainda não existir, para
+    que a compra posterior possa alimentar o estoque.
     """
     empresa_id = current_user.empresa_id
     obras_disponiveis = obras_do_usuario()
@@ -5376,158 +5487,182 @@ def nova_solicitacao():
             flash("Selecione uma obra válida e acessível.", "danger")
             return redirect(url_for("nova_solicitacao"))
 
-        if tipo in ("material", "ferramenta"):
-            selecionados = request.form.getlist("recursos")
-            if not selecionados:
-                flash("Marque pelo menos um recurso para solicitar.", "danger")
-                return redirect(url_for("nova_solicitacao"))
+        try:
+            if tipo in ("material", "ferramenta"):
+                selecionados = request.form.getlist("recursos")
+                if not selecionados:
+                    flash("Marque pelo menos um recurso para solicitar.", "danger")
+                    return redirect(url_for("nova_solicitacao"))
 
-            criadas = 0
-            erros = []
+                catalogo = (
+                    MATERIAIS_CATALOGO
+                    if tipo == "material"
+                    else FERRAMENTAS_CATALOGO
+                )
 
-            for chave in selecionados:
+                criadas = 0
+
+                for chave in selecionados:
+                    partes = chave.split(":", 1)
+                    if len(partes) != 2 or partes[0] != tipo:
+                        raise ValueError("Um dos recursos selecionados é inválido.")
+
+                    try:
+                        item_id = int(partes[1])
+                    except (ValueError, TypeError):
+                        raise ValueError("Um dos recursos selecionados é inválido.")
+
+                    if not 0 <= item_id < len(catalogo):
+                        raise ValueError("O recurso selecionado não existe no catálogo.")
+
+                    item = catalogo[item_id]
+                    quantidade_raw = request.form.get(
+                        f"quantidade_{tipo}_{item_id}",
+                        "1"
+                    )
+
+                    try:
+                        quantidade = float(
+                            str(quantidade_raw or "1").replace(",", ".")
+                        )
+                    except (ValueError, TypeError):
+                        raise ValueError(
+                            f"Quantidade inválida para {item['nome']}."
+                        )
+
+                    if quantidade <= 0:
+                        raise ValueError(
+                            f"Informe uma quantidade válida para {item['nome']}."
+                        )
+
+                    if tipo == "material":
+                        recurso = Material.query.filter(
+                            Material.empresa_id == empresa_id,
+                            db.func.lower(Material.nome) == item["nome"].lower(),
+                        ).first()
+
+                        if not recurso:
+                            recurso = Material(
+                                empresa_id=empresa_id,
+                                categoria=item["categoria"],
+                                nome=item["nome"],
+                                descricao=item.get("descricao", ""),
+                                unidade=item.get("unidade", "un"),
+                                estoque_minimo=0,
+                                estoque_atual=0,
+                                ativo=True,
+                            )
+                            db.session.add(recurso)
+                            db.session.flush()
+                        elif not recurso.ativo:
+                            recurso.ativo = True
+
+                        nova = Solicitacao(
+                            obra_id=obra.id,
+                            material_id=recurso.id,
+                            ferramenta_id=None,
+                            usuario_id=current_user.id,
+                            quantidade=quantidade,
+                            observacao=observacao,
+                            status="pendente",
+                            tipo_recurso="material",
+                            recurso_nome=recurso.nome,
+                        )
+
+                    else:
+                        recurso = Ferramenta.query.filter(
+                            Ferramenta.empresa_id == empresa_id,
+                            db.func.lower(Ferramenta.nome) == item["nome"].lower(),
+                        ).first()
+
+                        if not recurso:
+                            recurso = Ferramenta(
+                                empresa_id=empresa_id,
+                                categoria=item["categoria"],
+                                nome=item["nome"],
+                                descricao=item.get("descricao", ""),
+                                unidade=item.get("unidade", "un"),
+                                estoque_minimo=0,
+                                estoque_atual=0,
+                                ativo=True,
+                            )
+                            db.session.add(recurso)
+                            db.session.flush()
+                        elif not recurso.ativo:
+                            recurso.ativo = True
+
+                        nova = Solicitacao(
+                            obra_id=obra.id,
+                            material_id=None,
+                            ferramenta_id=recurso.id,
+                            usuario_id=current_user.id,
+                            quantidade=quantidade,
+                            observacao=observacao,
+                            status="pendente",
+                            tipo_recurso="ferramenta",
+                            recurso_nome=recurso.nome,
+                        )
+
+                    db.session.add(nova)
+                    criadas += 1
+
+                db.session.commit()
+                flash(
+                    f"{criadas} solicitação(ões) enviada(s) para compra.",
+                    "success",
+                )
+                return redirect(url_for("solicitacoes"))
+
+            if tipo == "outro":
+                recurso_nome = (request.form.get("recurso_nome") or "").strip()
                 try:
-                    tipo_item, item_id = chave.split(":", 1)
-                    item_id = int(item_id)
-                except (ValueError, TypeError):
-                    erros.append("Um recurso selecionado é inválido.")
-                    continue
-
-                if tipo_item != tipo:
-                    continue
-
-                quantidade_raw = request.form.get(f"quantidade_{tipo}_{item_id}")
-                try:
-                    quantidade = float((quantidade_raw or "").replace(",", "."))
+                    quantidade = float(
+                        str(request.form.get("quantidade") or "").replace(",", ".")
+                    )
                 except (ValueError, TypeError):
                     quantidade = 0
 
-                if quantidade <= 0:
-                    erros.append(f"Informe a quantidade de {chave.split(':',1)[0]} selecionado.")
-                    continue
+                if not recurso_nome or quantidade <= 0:
+                    flash(
+                        "Informe o recurso e uma quantidade válida.",
+                        "danger",
+                    )
+                    return redirect(url_for("nova_solicitacao"))
 
-                if tipo == "material":
-                    if item_id < 0 or item_id >= len(MATERIAIS_CATALOGO):
-                        erros.append("Material do catálogo inválido.")
-                        continue
-                    item = MATERIAIS_CATALOGO[item_id]
-                    nome = item["nome"]
-                    material = Material.query.filter(
-                        Material.empresa_id == empresa_id,
-                        db.func.lower(Material.nome) == nome.lower()
-                    ).first()
-                    if not material:
-                        material = Material(
-                            empresa_id=empresa_id,
-                            categoria=item["categoria"],
-                            nome=nome,
-                            descricao=item.get("descricao", ""),
-                            unidade=item.get("unidade", "un"),
-                            estoque_minimo=0,
-                            estoque_atual=0,
-                            ativo=True,
-                        )
-                        db.session.add(material)
-                        db.session.flush()
-                    elif not material.ativo:
-                        material.ativo = True
-                    nova = Solicitacao(
+                db.session.add(
+                    Solicitacao(
                         obra_id=obra.id,
-                        material_id=material.id,
-                        ferramenta_id=None,
                         usuario_id=current_user.id,
                         quantidade=quantidade,
                         observacao=observacao,
                         status="pendente",
-                        tipo_recurso="material",
-                        recurso_nome=material.nome,
+                        tipo_recurso="outro",
+                        recurso_nome=recurso_nome,
                     )
-                else:
-                    if item_id < 0 or item_id >= len(FERRAMENTAS_CATALOGO):
-                        erros.append("Ferramenta do catálogo inválida.")
-                        continue
-                    item = FERRAMENTAS_CATALOGO[item_id]
-                    nome = item["nome"]
-                    ferramenta = Ferramenta.query.filter(
-                        Ferramenta.empresa_id == empresa_id,
-                        db.func.lower(Ferramenta.nome) == nome.lower()
-                    ).first()
-                    if not ferramenta:
-                        ferramenta = Ferramenta(
-                            empresa_id=empresa_id,
-                            categoria=item["categoria"],
-                            nome=nome,
-                            descricao=item.get("descricao", ""),
-                            unidade=item.get("unidade", "un"),
-                            estoque_minimo=0,
-                            estoque_atual=0,
-                            ativo=True,
-                        )
-                        db.session.add(ferramenta)
-                        db.session.flush()
-                    elif not ferramenta.ativo:
-                        ferramenta.ativo = True
-                    nova = Solicitacao(
-                        obra_id=obra.id,
-                        material_id=None,
-                        ferramenta_id=ferramenta.id,
-                        usuario_id=current_user.id,
-                        quantidade=quantidade,
-                        observacao=observacao,
-                        status="pendente",
-                        tipo_recurso="ferramenta",
-                        recurso_nome=ferramenta.nome,
-                    )
-
-                db.session.add(nova)
-                criadas += 1
-
-            if erros:
-                db.session.rollback()
-                flash(" ".join(erros), "danger")
-                return redirect(url_for("nova_solicitacao"))
-
-            try:
+                )
                 db.session.commit()
-            except Exception:
-                db.session.rollback()
-                logging.exception("Erro ao criar solicitações em lote")
-                flash("Não foi possível enviar as solicitações.", "danger")
-                return redirect(url_for("nova_solicitacao"))
+                flash("Solicitação enviada para compra.", "success")
+                return redirect(url_for("solicitacoes"))
 
-            flash(f"{criadas} solicitação(ões) enviada(s) para compra.", "success")
-            return redirect(url_for("solicitacoes"))
+            flash("Tipo de solicitação inválido.", "danger")
+            return redirect(url_for("nova_solicitacao"))
 
-        if tipo == "outro":
-            recurso_nome = (request.form.get("recurso_nome") or "").strip()
-            try:
-                quantidade = float((request.form.get("quantidade") or "").replace(",", "."))
-            except (ValueError, TypeError):
-                quantidade = 0
-            if not recurso_nome or quantidade <= 0:
-                flash("Informe o recurso e uma quantidade válida.", "danger")
-                return redirect(url_for("nova_solicitacao"))
-            db.session.add(Solicitacao(
-                obra_id=obra.id,
-                usuario_id=current_user.id,
-                quantidade=quantidade,
-                observacao=observacao,
-                status="pendente",
-                tipo_recurso="outro",
-                recurso_nome=recurso_nome,
-            ))
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-                logging.exception("Erro ao criar solicitação genérica")
-                flash("Não foi possível enviar a solicitação.", "danger")
-                return redirect(url_for("nova_solicitacao"))
-            flash("Solicitação enviada para compra.", "success")
-            return redirect(url_for("solicitacoes"))
-
-        flash("Tipo de solicitação inválido.", "danger")
-        return redirect(url_for("nova_solicitacao"))
+        except Exception:
+            db.session.rollback()
+            logging.exception(
+                "ERRO AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s "
+                "selecionados=%s",
+                empresa_id,
+                obra_id,
+                tipo,
+                request.form.getlist("recursos"),
+            )
+            flash(
+                "Não foi possível criar a solicitação. "
+                "O erro foi registrado no servidor.",
+                "danger",
+            )
+            return redirect(url_for("nova_solicitacao"))
 
     return render_template(
         "solicitacao_form.html",
@@ -5655,7 +5790,7 @@ def marcar_solicitacao_comprada(
     "/solicitacoes/<int:solicitacao_id>/confirmar",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def confirmar_solicitacao(
     solicitacao_id
 ):
@@ -5886,7 +6021,7 @@ def confirmar_solicitacao(
     "/solicitacoes/<int:solicitacao_id>/cancelar",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def cancelar_solicitacao(
     solicitacao_id
 ):
@@ -6062,7 +6197,7 @@ def ferramentas():
     "/ferramentas/novo",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def nova_ferramenta():
 
     if request.method == "POST":
@@ -6201,7 +6336,7 @@ def nova_ferramenta():
     "/ferramentas/<int:ferramenta_id>/editar",
     methods=["GET", "POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def editar_ferramenta(ferramenta_id):
 
     ferramenta = db.session.get(
@@ -6360,7 +6495,7 @@ def editar_ferramenta(ferramenta_id):
     "/ferramentas/<int:ferramenta_id>/alternar-status",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def alternar_status_ferramenta(
     ferramenta_id
 ):
@@ -6755,7 +6890,7 @@ def saida_ferramenta(
     "/estoque/material/<int:material_id>/ajustar",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def ajustar_estoque_material(
     material_id
 ):
@@ -6863,7 +6998,7 @@ def ajustar_estoque_material(
     "/estoque/ferramenta/<int:ferramenta_id>/ajustar",
     methods=["POST"]
 )
-@empresa_admin_obrigatorio
+@gestao_empresa_obrigatorio
 def ajustar_estoque_ferramenta(
     ferramenta_id
 ):
