@@ -12,6 +12,7 @@ from flask import (
     url_for,
     request,
     flash,
+    jsonify,
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -1156,39 +1157,23 @@ def _coluna_existe(inspector, tabela, coluna):
 
 
 def inicializar_banco():
-    """Cria o banco e aplica migrações compatíveis sem apagar dados existentes."""
+    """Cria o banco e faz uma migração conservadora sem apagar dados."""
 
     db.create_all()
-
     inspector = inspect(db.engine)
+    tabelas_existentes = set(inspector.get_table_names())
 
-    # db.create_all() não altera tabelas que já existem.
-    # Por isso mantemos aqui as colunas que foram adicionadas ao longo
-    # das versões do sistema, inclusive campos antigos que podem faltar
-    # em bancos criados por versões anteriores.
+    # Compatibilidade explícita com versões anteriores do sistema.
     alteracoes = {
-        "empresas": {
-            "criado_em": "TIMESTAMP",
-        },
-        "usuarios": {
-            "empresa_id": "INTEGER",
-            "criado_em": "TIMESTAMP",
-        },
-        "obras": {
-            "criado_em": "TIMESTAMP",
-        },
+        "empresas": {"criado_em": "TIMESTAMP"},
+        "usuarios": {"empresa_id": "INTEGER", "criado_em": "TIMESTAMP"},
+        "obras": {"criado_em": "TIMESTAMP"},
         "usuario_obras": {
             "funcao_na_obra": "VARCHAR(80) DEFAULT 'funcionario'",
             "criado_em": "TIMESTAMP",
         },
-        "materiais": {
-            "empresa_id": "INTEGER",
-            "criado_em": "TIMESTAMP",
-        },
-        "ferramentas": {
-            "empresa_id": "INTEGER",
-            "criado_em": "TIMESTAMP",
-        },
+        "materiais": {"empresa_id": "INTEGER", "criado_em": "TIMESTAMP"},
+        "ferramentas": {"empresa_id": "INTEGER", "criado_em": "TIMESTAMP"},
         "solicitacoes": {
             "material_id": "INTEGER",
             "ferramenta_id": "INTEGER",
@@ -1199,88 +1184,91 @@ def inicializar_banco():
         },
     }
 
+    def adicionar_coluna(tabela, coluna, definicao):
+        nonlocal inspector, tabelas_existentes
+        if tabela not in tabelas_existentes or _coluna_existe(inspector, tabela, coluna):
+            return
+        sql = f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}"
+        with db.engine.begin() as conn:
+            conn.execute(text(sql))
+        logging.info("Coluna adicionada: %s.%s", tabela, coluna)
+        inspector = inspect(db.engine)
+
+    # Primeiro aplica as migrações conhecidas.
     for tabela, colunas in alteracoes.items():
-
-        if tabela not in inspector.get_table_names():
-            continue
-
         for coluna, definicao in colunas.items():
+            adicionar_coluna(tabela, coluna, definicao)
 
-            if _coluna_existe(inspector, tabela, coluna):
+    # Depois compara o schema atual com o metadata do SQLAlchemy. Isso evita
+    # que uma coluna criada em uma versão intermediária volte a causar 500.
+    inspector = inspect(db.engine)
+    tabelas_existentes = set(inspector.get_table_names())
+    for tabela, table_obj in db.metadata.tables.items():
+        if tabela not in tabelas_existentes:
+            continue
+        existentes = {c["name"] for c in inspector.get_columns(tabela)}
+        for coluna in table_obj.columns:
+            if coluna.name in existentes or coluna.primary_key:
                 continue
-
-            sql = (
-                f"ALTER TABLE {tabela} "
-                f"ADD COLUMN {coluna} {definicao}"
-            )
-
             try:
-                with db.engine.begin() as conn:
-                    conn.execute(text(sql))
-
-                logging.info(
-                    "Coluna adicionada automaticamente: %s.%s",
-                    tabela,
-                    coluna,
-                )
-
+                tipo = coluna.type.compile(dialect=db.engine.dialect)
             except Exception:
-                logging.exception(
-                    "Falha ao adicionar coluna %s.%s",
-                    tabela,
-                    coluna,
-                )
+                tipo = "TEXT"
+            definicao = tipo
+            # Somente defaults simples e portáveis entram no ALTER TABLE.
+            if coluna.server_default is not None:
+                try:
+                    default_sql = str(coluna.server_default.arg)
+                    if default_sql:
+                        definicao += f" DEFAULT {default_sql}"
+                except Exception:
+                    pass
+            try:
+                adicionar_coluna(tabela, coluna.name, definicao)
+            except Exception:
+                # Não mascara o erro: se uma coluna realmente necessária não
+                # puder ser criada, o Render deve mostrar a causa no log.
+                logging.exception("Falha ao compatibilizar %s.%s", tabela, coluna.name)
                 raise
-
-            inspector = inspect(db.engine)
 
     # Valores seguros para registros antigos.
     try:
+        inspector = inspect(db.engine)
         tabelas = set(inspector.get_table_names())
-
-        if "solicitacoes" in tabelas and _coluna_existe(
-            inspector, "solicitacoes", "tipo_recurso"
-        ):
+        if "solicitacoes" in tabelas and _coluna_existe(inspector, "solicitacoes", "tipo_recurso"):
             with db.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "UPDATE solicitacoes "
-                        "SET tipo_recurso = 'material' "
-                        "WHERE tipo_recurso IS NULL "
-                        "OR tipo_recurso = ''"
-                    )
-                )
-
-        if "usuario_obras" in tabelas and _coluna_existe(
-            inspector, "usuario_obras", "funcao_na_obra"
-        ):
+                conn.execute(text("UPDATE solicitacoes SET tipo_recurso = 'material' WHERE tipo_recurso IS NULL OR tipo_recurso = ''"))
+        if "usuario_obras" in tabelas and _coluna_existe(inspector, "usuario_obras", "funcao_na_obra"):
             with db.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "UPDATE usuario_obras "
-                        "SET funcao_na_obra = 'funcionario' "
-                        "WHERE funcao_na_obra IS NULL "
-                        "OR funcao_na_obra = ''"
-                    )
-                )
-
+                conn.execute(text("UPDATE usuario_obras SET funcao_na_obra = 'funcionario' WHERE funcao_na_obra IS NULL OR funcao_na_obra = ''"))
+        if "usuarios" in tabelas:
+            with db.engine.begin() as conn:
+                conn.execute(text("UPDATE usuarios SET ativo = TRUE WHERE ativo IS NULL"))
+                conn.execute(text("UPDATE usuarios SET funcao = 'funcionario' WHERE funcao IS NULL OR funcao = ''"))
+        if "empresas" in tabelas:
+            with db.engine.begin() as conn:
+                conn.execute(text("UPDATE empresas SET ativo = TRUE WHERE ativo IS NULL"))
+        if "materiais" in tabelas:
+            with db.engine.begin() as conn:
+                conn.execute(text("UPDATE materiais SET ativo = TRUE WHERE ativo IS NULL"))
+                conn.execute(text("UPDATE materiais SET estoque_atual = 0 WHERE estoque_atual IS NULL"))
+                conn.execute(text("UPDATE materiais SET estoque_minimo = 0 WHERE estoque_minimo IS NULL"))
+        if "ferramentas" in tabelas:
+            with db.engine.begin() as conn:
+                conn.execute(text("UPDATE ferramentas SET ativo = TRUE WHERE ativo IS NULL"))
+                conn.execute(text("UPDATE ferramentas SET estoque_atual = 0 WHERE estoque_atual IS NULL"))
+                conn.execute(text("UPDATE ferramentas SET estoque_minimo = 0 WHERE estoque_minimo IS NULL"))
+        if "obras" in tabelas:
+            with db.engine.begin() as conn:
+                conn.execute(text("UPDATE obras SET status = 'planejamento' WHERE status IS NULL OR status = ''"))
     except Exception:
-        logging.exception(
-            "Falha ao normalizar dados de compatibilidade do banco."
-        )
+        logging.exception("Falha ao normalizar dados antigos do banco.")
         raise
 
-    # Garante que exista um ADM Geral quando o banco ainda não possui um.
-    # As credenciais vêm exclusivamente das variáveis do Render.
-    admin_usuario = normalizar_usuario(
-        os.getenv("ADMIN_USER", "admin")
-    )
+    # Garante que exista um ADM Geral. As credenciais vêm do Render.
+    admin_usuario = normalizar_usuario(os.getenv("ADMIN_USER", "admin"))
     admin_senha = os.getenv("ADMIN_PASSWORD", "admin123")
-
-    admin = Usuario.query.filter_by(
-        usuario=admin_usuario
-    ).first()
-
+    admin = Usuario.query.filter_by(usuario=admin_usuario).first()
     if not admin:
         admin = Usuario(
             nome="Administrador Geral",
@@ -1329,6 +1317,21 @@ def garantir_banco_inicializado():
             )
 
     return None
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.route("/health")
+def health():
+    """Endpoint simples para verificar se o processo Flask está respondendo."""
+    try:
+        db.session.execute(text("SELECT 1"))
+        return jsonify({"status": "ok", "database": "ok"}), 200
+    except Exception as exc:
+        logging.exception("Health check do banco falhou.")
+        return jsonify({"status": "degraded", "database": "error", "detail": str(exc)}), 503
 
 
 # ============================================================
@@ -2665,8 +2668,13 @@ def funcionarios():
 
     empresa = empresa_usuario_atual()
 
-    usuarios = Usuario.query.filter_by(
-        empresa_id=empresa.id
+    usuarios = Usuario.query.filter(
+        Usuario.empresa_id == empresa.id,
+        Usuario.funcao.notin_([
+            "adm",
+            "administrador_empresa",
+            "admin_empresa",
+        ])
     ).order_by(
         Usuario.nome.asc()
     ).all()
@@ -2740,6 +2748,17 @@ def editar_funcionario(usuario_id):
 
         flash(
             "O ADM geral não pode ser editado por esta tela.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("funcionarios")
+        )
+
+    if funcionario.funcao in {"administrador_empresa", "admin_empresa"}:
+
+        flash(
+            "Administradores da empreiteira são gerenciados pelo ADM Geral.",
             "warning"
         )
 
@@ -3617,9 +3636,14 @@ def equipe_obra(obra_id):
             url_for("obras")
         )
 
-    usuarios = Usuario.query.filter_by(
-        empresa_id=current_user.empresa_id,
-        ativo=True
+    usuarios = Usuario.query.filter(
+        Usuario.empresa_id == current_user.empresa_id,
+        Usuario.ativo.is_(True),
+        Usuario.funcao.notin_([
+            "adm",
+            "administrador_empresa",
+            "admin_empresa",
+        ])
     ).order_by(
         Usuario.nome.asc()
     ).all()
@@ -3634,6 +3658,9 @@ def equipe_obra(obra_id):
             request.form.get("funcao_na_obra")
             or "funcionario"
         ).strip()
+
+        if funcao_na_obra not in FUNCOES_FUNCIONARIOS:
+            funcao_na_obra = "funcionario"
 
         try:
 
@@ -7064,9 +7091,14 @@ def erro_interno(error):
     except Exception:
         pass
 
-    logging.exception(
-        "Erro interno não tratado"
-    )
+    try:
+        logging.error(
+            "Erro interno não tratado: %s",
+            error,
+            exc_info=(type(error), error, error.__traceback__),
+        )
+    except Exception:
+        logging.exception("Falha ao registrar o erro interno.")
 
     try:
         return render_template("500.html"), 500
