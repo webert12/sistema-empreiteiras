@@ -2,6 +2,7 @@ import os
 import logging
 import threading
 import unicodedata
+import uuid
 from datetime import datetime
 from functools import wraps
 
@@ -1232,6 +1233,83 @@ def _coluna_existe(inspector, tabela, coluna):
         return False
 
 
+
+def _reconstruir_solicitacoes_sqlite_se_necessario():
+    """Corrige bancos SQLite antigos onde material_id/ferramenta_id eram NOT NULL.
+
+    SQLite não suporta ALTER COLUMN DROP NOT NULL. Quando encontra esse schema
+    legado, recria somente a tabela de solicitações, preservando os dados.
+    """
+    if db.engine.dialect.name != "sqlite":
+        return
+
+    inspector = inspect(db.engine)
+    if "solicitacoes" not in inspector.get_table_names():
+        return
+
+    cols = {c["name"]: c for c in inspector.get_columns("solicitacoes")}
+    obrigatorios = ["material_id", "ferramenta_id"]
+    if not any(cols.get(c, {}).get("nullable") is False for c in obrigatorios if c in cols):
+        return
+
+    logging.warning("Schema SQLite legado detectado em solicitacoes; reconstruindo tabela com vínculos opcionais.")
+    required = {
+        "id", "obra_id", "material_id", "ferramenta_id", "usuario_id", "quantidade",
+        "observacao", "status", "tipo_recurso", "recurso_nome", "criado_em",
+        "confirmado_por_id", "confirmado_em",
+    }
+    if not required.issubset(cols):
+        missing = sorted(required - set(cols))
+        raise RuntimeError(f"Tabela solicitacoes antiga sem colunas necessárias: {missing}")
+
+    conn = db.engine.raw_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA foreign_keys=OFF")
+        cur.execute("ALTER TABLE solicitacoes RENAME TO solicitacoes_legacy")
+        cur.execute("""
+            CREATE TABLE solicitacoes (
+                id INTEGER NOT NULL PRIMARY KEY,
+                obra_id INTEGER NOT NULL,
+                material_id INTEGER,
+                ferramenta_id INTEGER,
+                usuario_id INTEGER NOT NULL,
+                quantidade FLOAT NOT NULL,
+                observacao TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'pendente',
+                tipo_recurso VARCHAR(30) NOT NULL DEFAULT 'material',
+                recurso_nome VARCHAR(200),
+                criado_em DATETIME,
+                confirmado_por_id INTEGER,
+                confirmado_em DATETIME,
+                FOREIGN KEY(obra_id) REFERENCES obras(id),
+                FOREIGN KEY(material_id) REFERENCES materiais(id),
+                FOREIGN KEY(ferramenta_id) REFERENCES ferramentas(id),
+                FOREIGN KEY(usuario_id) REFERENCES usuarios(id),
+                FOREIGN KEY(confirmado_por_id) REFERENCES usuarios(id)
+            )
+        """)
+        cur.execute("""
+            INSERT INTO solicitacoes
+            (id, obra_id, material_id, ferramenta_id, usuario_id, quantidade,
+             observacao, status, tipo_recurso, recurso_nome, criado_em,
+             confirmado_por_id, confirmado_em)
+            SELECT id, obra_id, material_id, ferramenta_id, usuario_id, quantidade,
+                   observacao, COALESCE(status, 'pendente'),
+                   COALESCE(tipo_recurso, CASE WHEN ferramenta_id IS NOT NULL THEN 'ferramenta' ELSE 'material' END),
+                   recurso_nome, criado_em, confirmado_por_id, confirmado_em
+            FROM solicitacoes_legacy
+        """)
+        cur.execute("DROP TABLE solicitacoes_legacy")
+        cur.execute("PRAGMA foreign_keys=ON")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def inicializar_banco():
     """Cria o banco e faz uma migração conservadora sem apagar dados."""
 
@@ -1284,6 +1362,8 @@ def inicializar_banco():
     for tabela, colunas in alteracoes.items():
         for coluna, definicao in colunas.items():
             adicionar_coluna(tabela, coluna, definicao)
+
+    _reconstruir_solicitacoes_sqlite_se_necessario()
 
     # Versões antigas do sistema chegaram a criar material_id e/ou
     # ferramenta_id como NOT NULL. Uma solicitação agora pode representar
@@ -5578,10 +5658,10 @@ def _criar_solicitacao_pendente(obra, tipo, recurso, quantidade, observacao):
 )
 @empresa_acesso_obrigatorio
 def nova_solicitacao():
-    """Cria solicitações sem limitar o usuário ao catálogo.
+    """Cria solicitações de material, ferramenta ou item livre.
 
-    O usuário pode marcar itens do catálogo e/ou cadastrar itens manualmente.
-    O estoque atual nunca impede uma solicitação.
+    O estoque nunca limita o pedido. Itens do catálogo e itens digitados
+    manualmente são aceitos. Cada item vira uma solicitação independente.
     """
     empresa_id = current_user.empresa_id
     obras_disponiveis = obras_do_usuario()
@@ -5589,167 +5669,109 @@ def nova_solicitacao():
     if request.method == "POST":
         try:
             obra_id = int(request.form.get("obra_id") or 0)
-        except (ValueError, TypeError):
+        except (TypeError, ValueError):
             obra_id = 0
 
         tipo = (request.form.get("tipo_recurso") or "material").strip().lower()
         observacao = (request.form.get("observacao") or "").strip()
 
-        obra = db.session.get(Obra, obra_id) if obra_id else None
-        if not obra or obra.empresa_id != empresa_id or not usuario_tem_acesso_obra(obra):
-            flash("Selecione uma obra válida e acessível.", "danger")
-            return redirect(url_for("nova_solicitacao"))
-
-        if tipo not in ("material", "ferramenta", "outro"):
-            flash("Tipo de solicitação inválido.", "danger")
-            return redirect(url_for("nova_solicitacao"))
-
         try:
+            if tipo not in {"material", "ferramenta", "outro"}:
+                raise ValueError("Tipo de solicitação inválido.")
+
+            obra = db.session.get(Obra, obra_id) if obra_id else None
+            if not obra or obra.empresa_id != empresa_id or not usuario_tem_acesso_obra(current_user, obra):
+                raise ValueError("Selecione uma obra válida e acessível.")
+
             criadas = 0
 
-            if tipo in ("material", "ferramenta"):
+            if tipo in {"material", "ferramenta"}:
                 selecionados = request.form.getlist("recursos")
                 catalogo = MATERIAIS_CATALOGO if tipo == "material" else FERRAMENTAS_CATALOGO
 
-                # Itens escolhidos no catálogo.
                 for chave in selecionados:
-                    partes = chave.split(":", 1)
-                    if len(partes) != 2 or partes[0] != tipo:
-                        raise ValueError("Um dos recursos selecionados é inválido.")
-
                     try:
-                        item_id = int(partes[1])
+                        prefixo, indice = chave.split(":", 1)
+                        item_id = int(indice)
                     except (ValueError, TypeError):
-                        raise ValueError("Um dos recursos selecionados é inválido.")
-
-                    if not 0 <= item_id < len(catalogo):
-                        raise ValueError("O recurso selecionado não existe no catálogo.")
+                        raise ValueError("Um dos itens selecionados é inválido.")
+                    if prefixo != tipo or item_id < 0 or item_id >= len(catalogo):
+                        raise ValueError("Um dos itens selecionados não existe no catálogo.")
 
                     item = catalogo[item_id]
-                    quantidade_raw = request.form.get(
-                        f"quantidade_{tipo}_{item_id}", "1"
+                    qtd = _quantidade_positiva(
+                        request.form.get(f"quantidade_{tipo}_{item_id}", "1"),
+                        item["nome"],
                     )
-                    quantidade = _quantidade_positiva(quantidade_raw, item["nome"])
-                    unidade = item.get("unidade", "un")
+                    unidade = "un" if tipo == "ferramenta" else (item.get("unidade") or "un")
                     recurso = _obter_ou_criar_recurso_solicitacao(
-                        empresa_id=empresa_id,
-                        tipo=tipo,
-                        nome=item["nome"],
-                        categoria=item.get("categoria", "Outros"),
-                        unidade=unidade,
-                        descricao=item.get("descricao", ""),
+                        empresa_id, tipo, item["nome"], item.get("categoria", "Outros"),
+                        unidade, item.get("descricao", "")
                     )
-                    _criar_solicitacao_pendente(
-                        obra=obra,
-                        tipo=tipo,
-                        recurso=recurso,
-                        quantidade=quantidade,
-                        observacao=observacao,
-                    )
+                    _criar_solicitacao_pendente(obra, tipo, recurso, qtd, observacao)
                     criadas += 1
 
-                # Itens digitados manualmente. Os arrays permitem adicionar
-                # vários itens que não estão no catálogo na mesma solicitação.
                 nomes = request.form.getlist("custom_nome[]")
                 quantidades = request.form.getlist("custom_quantidade[]")
                 unidades = request.form.getlist("custom_unidade[]")
+                categorias = request.form.getlist("custom_categoria[]")
 
                 for idx, nome_raw in enumerate(nomes):
                     nome = (nome_raw or "").strip()
                     if not nome:
                         continue
-
-                    quantidade_raw = quantidades[idx] if idx < len(quantidades) else ""
-                    quantidade = _quantidade_positiva(quantidade_raw, nome)
+                    qtd_raw = quantidades[idx] if idx < len(quantidades) else ""
+                    qtd = _quantidade_positiva(qtd_raw, nome)
                     if tipo == "ferramenta":
                         unidade = "un"
                     else:
-                        unidade = (
-                            unidades[idx].strip()
-                            if idx < len(unidades) and unidades[idx].strip()
-                            else "un"
-                        )
-
+                        unidade = (unidades[idx] if idx < len(unidades) else "un").strip() or "un"
+                    categoria = (categorias[idx] if idx < len(categorias) else "Outros").strip() or "Outros"
                     recurso = _obter_ou_criar_recurso_solicitacao(
-                        empresa_id=empresa_id,
-                        tipo=tipo,
-                        nome=nome,
-                        categoria="Outros",
-                        unidade=unidade,
-                        descricao="Item cadastrado manualmente durante a solicitação.",
+                        empresa_id, tipo, nome, categoria, unidade,
+                        "Item cadastrado manualmente durante a solicitação."
                     )
-                    _criar_solicitacao_pendente(
-                        obra=obra,
-                        tipo=tipo,
-                        recurso=recurso,
-                        quantidade=quantidade,
-                        observacao=observacao,
-                    )
+                    _criar_solicitacao_pendente(obra, tipo, recurso, qtd, observacao)
                     criadas += 1
 
-                if criadas == 0:
-                    raise ValueError(
-                        "Marque um item do catálogo ou adicione pelo menos um item manual."
-                    )
+                if not criadas:
+                    raise ValueError("Marque um item do catálogo ou adicione um item manual.")
 
-                db.session.commit()
-                flash(f"{criadas} solicitação(ões) enviada(s) para compra.", "success")
-                return redirect(url_for("solicitacoes"))
+            else:
+                nome = (request.form.get("recurso_nome") or "").strip()
+                qtd = _quantidade_positiva(request.form.get("quantidade") or "", nome or "recurso")
+                if not nome:
+                    raise ValueError("Informe o que precisa ser comprado.")
+                db.session.add(Solicitacao(
+                    obra_id=obra.id, material_id=None, ferramenta_id=None,
+                    usuario_id=current_user.id, quantidade=qtd, observacao=observacao,
+                    status="pendente", tipo_recurso="outro", recurso_nome=nome,
+                ))
+                criadas = 1
 
-            # Tipo livre sem vínculo de estoque.
-            if tipo == "outro":
-                recurso_nome = (request.form.get("recurso_nome") or "").strip()
-                quantidade = _quantidade_positiva(
-                    request.form.get("quantidade") or "", recurso_nome or "recurso"
-                ) if recurso_nome else 0
-
-                if not recurso_nome or quantidade <= 0:
-                    flash("Informe o recurso e uma quantidade válida.", "danger")
-                    return redirect(url_for("nova_solicitacao"))
-
-                db.session.add(
-                    Solicitacao(
-                        obra_id=obra.id,
-                        material_id=None,
-                        ferramenta_id=None,
-                        usuario_id=current_user.id,
-                        quantidade=quantidade,
-                        observacao=observacao,
-                        status="pendente",
-                        tipo_recurso="outro",
-                        recurso_nome=recurso_nome,
-                    )
-                )
-                db.session.commit()
-                flash("Solicitação enviada para compra.", "success")
-                return redirect(url_for("solicitacoes"))
+            db.session.commit()
+            flash(f"{criadas} solicitação(ões) enviada(s) para compra.", "success")
+            return redirect(url_for("solicitacoes"))
 
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), "danger")
             return redirect(url_for("nova_solicitacao"))
-        except IntegrityError:
+        except IntegrityError as exc:
             db.session.rollback()
             logging.exception(
-                "INTEGRITY ERROR AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s",
-                empresa_id, obra_id, tipo,
+                "INTEGRITY ERROR AO CRIAR SOLICITACAO id=%s empresa=%s obra=%s tipo=%s",
+                request.form.get("obra_id"), empresa_id, obra_id, tipo,
             )
-            flash(
-                "Não foi possível enviar a solicitação por causa de uma incompatibilidade no banco. "
-                "A correção foi registrada no log do servidor.",
-                "danger",
-            )
+            flash("Não foi possível salvar a solicitação. O banco recusou os dados enviados.", "danger")
             return redirect(url_for("nova_solicitacao"))
         except Exception:
             db.session.rollback()
             logging.exception(
-                "ERRO AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s selecionados=%s",
-                empresa_id, obra_id, tipo, request.form.getlist("recursos"),
+                "ERRO AO CRIAR SOLICITACAO empresa=%s obra=%s tipo=%s form=%s",
+                empresa_id, obra_id, tipo, dict(request.form),
             )
-            flash(
-                "Não foi possível criar a solicitação. O erro foi registrado no servidor.",
-                "danger",
-            )
+            flash("Não foi possível enviar a solicitação. O erro foi registrado no servidor.", "danger")
             return redirect(url_for("nova_solicitacao"))
 
     return render_template(
