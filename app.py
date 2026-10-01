@@ -1317,6 +1317,19 @@ def inicializar_banco():
                 logging.exception("Falha ao compatibilizar %s.%s", tabela, coluna.name)
                 raise
 
+    # Solicitações podem ser de material OU ferramenta. Em bancos legados,
+    # versões antigas podem ter deixado material_id/ferramenta_id como NOT NULL.
+    # Isso fazia qualquer solicitação do tipo oposto falhar no commit.
+    if db.engine.dialect.name == "postgresql" and "solicitacoes" in tabelas_existentes:
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE solicitacoes ALTER COLUMN material_id DROP NOT NULL"))
+                conn.execute(text("ALTER TABLE solicitacoes ALTER COLUMN ferramenta_id DROP NOT NULL"))
+            logging.info("Colunas material_id/ferramenta_id da tabela solicitacoes ajustadas para aceitar NULL.")
+        except Exception:
+            logging.exception("Falha ao ajustar nulabilidade das referências de solicitacoes.")
+            raise
+
     # Valores seguros para registros antigos.
     try:
         inspector = inspect(db.engine)
@@ -4134,21 +4147,21 @@ MATERIAIS_CATALOGO = [
     {
         "nome": "Argamassa AC-I",
         "categoria": "Cimento e argamassas",
-        "unidade": "saco",
+        "unidade": "kg",
         "descricao": "Argamassa colante para áreas internas."
     },
 
     {
         "nome": "Argamassa AC-II",
         "categoria": "Cimento e argamassas",
-        "unidade": "saco",
+        "unidade": "kg",
         "descricao": "Argamassa colante para áreas internas e externas."
     },
 
     {
         "nome": "Argamassa AC-III",
         "categoria": "Cimento e argamassas",
-        "unidade": "saco",
+        "unidade": "kg",
         "descricao": "Argamassa colante de maior desempenho."
     },
 
@@ -5006,7 +5019,7 @@ def dados_ferramentas_catalogo():
         {
             "nome": item["nome"],
             "categoria": item["categoria"],
-            "unidade": item["unidade"],
+            "unidade": "un",
             "descricao": item.get("descricao", ""),
         }
         for item in FERRAMENTAS_CATALOGO
@@ -5071,137 +5084,82 @@ def materiais():
 )
 @gestao_empresa_obrigatorio
 def novo_material():
-
+    """Cadastro em lote de materiais do catálogo, com estoque inicial por item."""
     empresa = empresa_usuario_atual()
-
     if not empresa:
-
-        flash(
-            "Empresa não encontrada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("empresa_dashboard")
-        )
+        flash("Empresa não encontrada.", "danger")
+        return redirect(url_for("empresa_dashboard"))
 
     if request.method == "POST":
-
-        nome = (
-            request.form.get("nome")
-            or ""
-        ).strip()
-
-        catalogo = material_catalogo_por_nome(
-            nome
-        )
-
-        if catalogo:
-
-            categoria = catalogo["categoria"]
-
-            unidade = catalogo["unidade"]
-
-            descricao = catalogo.get(
-                "descricao",
-                ""
-            )
-
-        else:
-
-            categoria = (
-                request.form.get("categoria")
-                or "Outros"
-            ).strip()
-
-            unidade = (
-                request.form.get("unidade")
-                or "un"
-            ).strip()
-
-            descricao = (
-                request.form.get("descricao")
-                or ""
-            ).strip()
-
-        if not nome:
-
-            flash(
-                "Informe o nome do material.",
-                "danger"
-            )
-
-            return render_template(
-                "material_form.html",
-                material=None,
-                empresa=empresa,
-                catalogo_materiais=dados_material_catalogo(),
-                titulo="Novo material"
-            )
-
         try:
+            selecionados = request.form.getlist("recursos")
+            if not selecionados:
+                flash("Marque pelo menos um material para adicionar.", "danger")
+                return redirect(url_for("novo_material"))
 
-            estoque_minimo = float(
-                request.form.get(
-                    "estoque_minimo",
-                    0
-                ) or 0
-            )
+            criados = 0
+            atualizados = 0
+            for chave in selecionados:
+                partes = chave.split(":", 1)
+                if len(partes) != 2 or partes[0] != "material":
+                    raise ValueError("Material selecionado inválido.")
+                try:
+                    item_id = int(partes[1])
+                except (ValueError, TypeError):
+                    raise ValueError("Material selecionado inválido.")
+                if not 0 <= item_id < len(MATERIAIS_CATALOGO):
+                    raise ValueError("Material selecionado não existe no catálogo.")
 
-        except (
-            ValueError,
-            TypeError
-        ):
+                item = MATERIAIS_CATALOGO[item_id]
+                raw = request.form.get(f"quantidade_material_{item_id}", "0")
+                try:
+                    quantidade = float(str(raw or "0").replace(",", "."))
+                except (ValueError, TypeError):
+                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
+                if quantidade < 0:
+                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
 
-            estoque_minimo = 0
+                recurso = Material.query.filter(
+                    Material.empresa_id == empresa.id,
+                    db.func.lower(Material.nome) == item["nome"].lower(),
+                ).first()
 
-        material = Material(
-            empresa_id=empresa.id,
-            categoria=categoria,
-            nome=nome,
-            descricao=descricao,
-            unidade=unidade,
-            estoque_minimo=estoque_minimo,
-            estoque_atual=0,
-            ativo=True,
-        )
-
-        db.session.add(
-            material
-        )
-
-        try:
+                if recurso:
+                    recurso.categoria = item["categoria"]
+                    recurso.unidade = item.get("unidade", "un")
+                    recurso.descricao = item.get("descricao", "")
+                    recurso.ativo = True
+                    recurso.estoque_atual = float(recurso.estoque_atual or 0) + quantidade
+                    atualizados += 1
+                else:
+                    db.session.add(Material(
+                        empresa_id=empresa.id,
+                        categoria=item["categoria"],
+                        nome=item["nome"],
+                        descricao=item.get("descricao", ""),
+                        unidade=item.get("unidade", "un"),
+                        estoque_minimo=0,
+                        estoque_atual=quantidade,
+                        ativo=True,
+                    ))
+                    criados += 1
 
             db.session.commit()
-
-            flash(
-                "Material cadastrado com sucesso.",
-                "success"
-            )
-
-            return redirect(
-                url_for("materiais")
-            )
-
+            flash(f"{criados + atualizados} material(is) processado(s). Estoque inicial atualizado.", "success")
+            return redirect(url_for("materiais"))
         except Exception:
-
             db.session.rollback()
-
-            logging.exception(
-                "Erro ao cadastrar material"
-            )
-
-            flash(
-                "Não foi possível cadastrar o material.",
-                "danger"
-            )
+            logging.exception("ERRO AO CADASTRAR MATERIAIS EM LOTE: selecionados=%s", request.form.getlist("recursos"))
+            flash("Não foi possível cadastrar os materiais. O erro foi registrado no servidor.", "danger")
+            return redirect(url_for("novo_material"))
 
     return render_template(
         "material_form.html",
         material=None,
         empresa=empresa,
         catalogo_materiais=dados_material_catalogo(),
-        titulo="Novo material"
+        titulo="Adicionar materiais",
+        modo_lote=True,
     )
 
 
@@ -5647,19 +5605,26 @@ def nova_solicitacao():
             flash("Tipo de solicitação inválido.", "danger")
             return redirect(url_for("nova_solicitacao"))
 
+        except IntegrityError as exc:
+            db.session.rollback()
+            logging.exception(
+                "ERRO DE INTEGRIDADE AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s selecionados=%s",
+                empresa_id, obra_id, tipo, request.form.getlist("recursos"),
+            )
+            flash(
+                "Não foi possível gravar a solicitação porque o banco ainda possui uma estrutura antiga. "
+                "Faça o novo deploy desta versão para aplicar a correção automática do banco.",
+                "danger",
+            )
+            return redirect(url_for("nova_solicitacao"))
         except Exception:
             db.session.rollback()
             logging.exception(
-                "ERRO AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s "
-                "selecionados=%s",
-                empresa_id,
-                obra_id,
-                tipo,
-                request.form.getlist("recursos"),
+                "ERRO AO CRIAR SOLICITACAO: empresa_id=%s obra_id=%s tipo=%s selecionados=%s",
+                empresa_id, obra_id, tipo, request.form.getlist("recursos"),
             )
             flash(
-                "Não foi possível criar a solicitação. "
-                "O erro foi registrado no servidor.",
+                "Não foi possível criar a solicitação. O erro foi registrado no servidor.",
                 "danger",
             )
             return redirect(url_for("nova_solicitacao"))
@@ -6199,132 +6164,80 @@ def ferramentas():
 )
 @gestao_empresa_obrigatorio
 def nova_ferramenta():
+    """Cadastro em lote de ferramentas do catálogo, sempre por unidade."""
+    empresa = empresa_usuario_atual()
+    if not empresa:
+        flash("Empresa não encontrada.", "danger")
+        return redirect(url_for("empresa_dashboard"))
 
     if request.method == "POST":
-
-        nome = (request.form.get("nome") or "").strip()
-        catalogo = ferramenta_catalogo_por_nome(nome)
-
-        categoria = (
-            catalogo["categoria"] if catalogo else request.form.get("categoria")
-            or ""
-        ).strip()
-
-        descricao = (
-            request.form.get("descricao")
-            or ""
-        ).strip()
-
-        unidade = (
-            catalogo["unidade"] if catalogo else request.form.get("unidade")
-            or "un"
-        ).strip()
-
-        if catalogo:
-            descricao = catalogo.get("descricao", "")
-
         try:
+            selecionados = request.form.getlist("recursos")
+            if not selecionados:
+                flash("Marque pelo menos uma ferramenta para adicionar.", "danger")
+                return redirect(url_for("nova_ferramenta"))
 
-            estoque_minimo = float(
-                request.form.get(
-                    "estoque_minimo",
-                    0
-                )
-                or 0
-            )
+            criados = 0
+            atualizados = 0
+            for chave in selecionados:
+                partes = chave.split(":", 1)
+                if len(partes) != 2 or partes[0] != "ferramenta":
+                    raise ValueError("Ferramenta selecionada inválida.")
+                try:
+                    item_id = int(partes[1])
+                except (ValueError, TypeError):
+                    raise ValueError("Ferramenta selecionada inválida.")
+                if not 0 <= item_id < len(FERRAMENTAS_CATALOGO):
+                    raise ValueError("Ferramenta selecionada não existe no catálogo.")
 
-            estoque_atual = float(
-                request.form.get(
-                    "estoque_atual",
-                    0
-                )
-                or 0
-            )
+                item = FERRAMENTAS_CATALOGO[item_id]
+                raw = request.form.get(f"quantidade_ferramenta_{item_id}", "0")
+                try:
+                    quantidade = float(str(raw or "0").replace(",", "."))
+                except (ValueError, TypeError):
+                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
+                if quantidade < 0:
+                    raise ValueError(f"Quantidade inválida para {item['nome']}.")
 
-        except (
-            ValueError,
-            TypeError
-        ):
+                recurso = Ferramenta.query.filter(
+                    Ferramenta.empresa_id == empresa.id,
+                    db.func.lower(Ferramenta.nome) == item["nome"].lower(),
+                ).first()
 
-            flash(
-                "Os valores de estoque são inválidos.",
-                "danger"
-            )
-
-            return render_template(
-                "ferramenta_form.html",
-                ferramenta=None,
-                titulo="Nova ferramenta"
-            )
-
-        if estoque_minimo < 0:
-            estoque_minimo = 0
-
-        if estoque_atual < 0:
-            estoque_atual = 0
-
-        if not categoria or not nome:
-
-            flash(
-                "Categoria e nome são obrigatórios.",
-                "danger"
-            )
-
-            return render_template(
-                "ferramenta_form.html",
-                ferramenta=None,
-                titulo="Nova ferramenta"
-            )
-
-        ferramenta = Ferramenta(
-            empresa_id=current_user.empresa_id,
-            categoria=categoria,
-            nome=nome,
-            descricao=descricao,
-            unidade=unidade,
-            estoque_minimo=estoque_minimo,
-            estoque_atual=estoque_atual,
-            ativo=True,
-        )
-
-        db.session.add(ferramenta)
-
-        try:
+                if recurso:
+                    recurso.categoria = item["categoria"]
+                    recurso.unidade = "un"
+                    recurso.descricao = item.get("descricao", "")
+                    recurso.ativo = True
+                    recurso.estoque_atual = float(recurso.estoque_atual or 0) + quantidade
+                    atualizados += 1
+                else:
+                    db.session.add(Ferramenta(
+                        empresa_id=empresa.id,
+                        categoria=item["categoria"],
+                        nome=item["nome"],
+                        descricao=item.get("descricao", ""),
+                        unidade="un",
+                        estoque_minimo=0,
+                        estoque_atual=quantidade,
+                        ativo=True,
+                    ))
+                    criados += 1
 
             db.session.commit()
-
+            flash(f"{criados + atualizados} ferramenta(s) processada(s). Quantidades atualizadas.", "success")
+            return redirect(url_for("ferramentas"))
         except Exception:
-
             db.session.rollback()
-
-            logging.exception(
-                "Erro ao cadastrar ferramenta"
-            )
-
-            flash(
-                "Não foi possível cadastrar a ferramenta.",
-                "danger"
-            )
-
-            return render_template(
-                "ferramenta_form.html",
-                ferramenta=None,
-                titulo="Nova ferramenta"
-            )
-
-        flash(
-            "Ferramenta cadastrada com sucesso.",
-            "success"
-        )
-
-        return redirect(
-            url_for("ferramentas")
-        )
+            logging.exception("ERRO AO CADASTRAR FERRAMENTAS EM LOTE: selecionados=%s", request.form.getlist("recursos"))
+            flash("Não foi possível cadastrar as ferramentas. O erro foi registrado no servidor.", "danger")
+            return redirect(url_for("nova_ferramenta"))
 
     return render_template(
         "ferramenta_form.html",
         ferramenta=None,
-        titulo="Nova ferramenta"
+        titulo="Adicionar ferramentas",
+        modo_lote=True,
     )
 
 
