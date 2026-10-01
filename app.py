@@ -6951,9 +6951,16 @@ def logout():
 @app.errorhandler(404)
 def pagina_nao_encontrada(error):
 
-    return render_template(
-        "404.html"
-    ), 404
+    try:
+        return render_template("404.html"), 404
+    except Exception:
+        logging.exception("Template 404.html indisponivel.")
+        return (
+            "<h1>404 - Pagina nao encontrada</h1>"
+            "<p>A pagina solicitada nao existe.</p>",
+            404,
+            {"Content-Type": "text/html; charset=utf-8"},
+        )
 
 
 @app.errorhandler(403)
@@ -6993,9 +7000,17 @@ def erro_interno(error):
         "Erro interno não tratado"
     )
 
-    return render_template(
-        "500.html"
-    ), 500
+    try:
+        return render_template("500.html"), 500
+    except Exception:
+        logging.exception("Template 500.html indisponivel.")
+        return (
+            "<h1>500 - Erro interno</h1>"
+            "<p>O sistema encontrou um erro interno. "
+            "Consulte os logs do servidor para identificar a causa.</p>",
+            500,
+            {"Content-Type": "text/html; charset=utf-8"},
+        )
 
 
 # ============================================================
