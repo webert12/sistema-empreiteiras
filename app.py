@@ -76,6 +76,16 @@ login_manager.login_message_category = "warning"
 logging.basicConfig(level=logging.INFO)
 
 
+@app.template_filter("quantidade")
+def formatar_quantidade(valor):
+    """Exibe quantidades sem zeros desnecessários: 5.0 -> 5; 2.5 -> 2.5."""
+    try:
+        numero = float(valor or 0)
+        return f"{numero:g}"
+    except (TypeError, ValueError):
+        return str(valor or "0")
+
+
 # ============================================================
 # CONSTANTES
 # ============================================================
@@ -1169,6 +1179,16 @@ def inicializar_banco():
     """Cria o banco e faz uma migração conservadora sem apagar dados."""
 
     db.create_all()
+
+    # Padroniza unidades antigas: o sistema usa metros (m), não m³,
+    # para os itens do catálogo e para registros legados.
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(text("UPDATE materiais SET unidade='m' WHERE unidade='m³'"))
+            conn.execute(text("UPDATE ferramentas SET unidade='m' WHERE unidade='m³'"))
+    except Exception:
+        logging.exception("Não foi possível normalizar unidades antigas.")
+        raise
     inspector = inspect(db.engine)
     tabelas_existentes = set(inspector.get_table_names())
 
@@ -1383,6 +1403,7 @@ def injetar_contexto():
         "eh_adm": eh_administrador(),
         "eh_adm_empresa": eh_administrador_empresa(),
         "eh_gestor": eh_gestor_empresa(),
+        "eh_estoque": (funcao_atual() in FUNCOES_ESTOQUE) or eh_administrador_empresa(),
         "empresa_atual": empresa,
         "funcoes_funcionarios": FUNCOES_FUNCIONARIOS,
         "status_obras": STATUS_OBRA,
@@ -3914,56 +3935,56 @@ MATERIAIS_CATALOGO = [
     {
         "nome": "Areia média",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Areia média para argamassas e concreto."
     },
 
     {
         "nome": "Areia grossa",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Areia grossa para concreto e serviços diversos."
     },
 
     {
         "nome": "Areia fina",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Areia fina para acabamento e argamassas."
     },
 
     {
         "nome": "Brita 0",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Brita zero para concreto e serviços de construção."
     },
 
     {
         "nome": "Brita 1",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Brita um para produção de concreto."
     },
 
     {
         "nome": "Brita 2",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Brita dois para concreto e fundações."
     },
 
     {
         "nome": "Pedra de mão",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Pedra de mão para fundações e contenções."
     },
 
     {
         "nome": "Pedrisco",
         "categoria": "Agregados",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Pedrisco para concreto e pavimentação."
     },
 
@@ -4041,7 +4062,7 @@ MATERIAIS_CATALOGO = [
     {
         "nome": "Concreto usinado",
         "categoria": "Concreto",
-        "unidade": "m³",
+        "unidade": "m",
         "descricao": "Concreto usinado para estruturas."
     },
 
@@ -4705,6 +4726,96 @@ MATERIAIS_CATALOGO = [
 
 
 # ============================================================
+# CATÁLOGO AMPLO DE FERRAMENTAS DE CONSTRUÇÃO
+# ============================================================
+
+FERRAMENTAS_CATALOGO = [
+    {"nome":"Pá de bico","categoria":"Ferramentas manuais","unidade":"un","descricao":"Pá de bico para escavação e movimentação de materiais."},
+    {"nome":"Pá quadrada","categoria":"Ferramentas manuais","unidade":"un","descricao":"Pá quadrada para movimentação de areia, terra e agregados."},
+    {"nome":"Enxada","categoria":"Ferramentas manuais","unidade":"un","descricao":"Enxada para escavação e preparo do solo."},
+    {"nome":"Enxadão","categoria":"Ferramentas manuais","unidade":"un","descricao":"Enxadão para solo duro e escavação."},
+    {"nome":"Picareta","categoria":"Ferramentas manuais","unidade":"un","descricao":"Picareta para escavação e rompimento de solo."},
+    {"nome":"Cavadeira articulada","categoria":"Ferramentas manuais","unidade":"un","descricao":"Cavadeira articulada para abertura de valas e furos."},
+    {"nome":"Cavadeira reta","categoria":"Ferramentas manuais","unidade":"un","descricao":"Cavadeira reta para escavação."},
+    {"nome":"Marreta 1 kg","categoria":"Ferramentas manuais","unidade":"un","descricao":"Marreta de 1 kg."},
+    {"nome":"Marreta 2 kg","categoria":"Ferramentas manuais","unidade":"un","descricao":"Marreta de 2 kg."},
+    {"nome":"Marreta 5 kg","categoria":"Ferramentas manuais","unidade":"un","descricao":"Marreta de 5 kg."},
+    {"nome":"Martelo de unha","categoria":"Ferramentas manuais","unidade":"un","descricao":"Martelo de unha para carpintaria e montagem."},
+    {"nome":"Martelo de borracha","categoria":"Ferramentas manuais","unidade":"un","descricao":"Martelo de borracha para assentamento e acabamento."},
+    {"nome":"Talhadeira","categoria":"Ferramentas manuais","unidade":"un","descricao":"Talhadeira para concreto e alvenaria."},
+    {"nome":"Ponteiro","categoria":"Ferramentas manuais","unidade":"un","descricao":"Ponteiro para rompimento e perfuração de alvenaria."},
+    {"nome":"Desempenadeira lisa","categoria":"Acabamento","unidade":"un","descricao":"Desempenadeira lisa para argamassa e reboco."},
+    {"nome":"Desempenadeira dentada","categoria":"Acabamento","unidade":"un","descricao":"Desempenadeira dentada para argamassa colante."},
+    {"nome":"Desempenadeira de espuma","categoria":"Acabamento","unidade":"un","descricao":"Desempenadeira de espuma para acabamento."},
+    {"nome":"Colher de pedreiro 8\"","categoria":"Assentamento","unidade":"un","descricao":"Colher de pedreiro para aplicação de argamassa."},
+    {"nome":"Colher de pedreiro 9\"","categoria":"Assentamento","unidade":"un","descricao":"Colher de pedreiro para assentamento."},
+    {"nome":"Colher de pedreiro 10\"","categoria":"Assentamento","unidade":"un","descricao":"Colher de pedreiro para assentamento."},
+    {"nome":"Prumo de parede","categoria":"Medição","unidade":"un","descricao":"Prumo para conferência de verticalidade."},
+    {"nome":"Nível de bolha","categoria":"Medição","unidade":"un","descricao":"Nível para conferência de alinhamento e nivelamento."},
+    {"nome":"Nível a laser","categoria":"Medição","unidade":"un","descricao":"Nível a laser para nivelamento e alinhamento."},
+    {"nome":"Trena 5 m","categoria":"Medição","unidade":"un","descricao":"Trena de 5 metros."},
+    {"nome":"Trena 10 m","categoria":"Medição","unidade":"un","descricao":"Trena de 10 metros."},
+    {"nome":"Trena 20 m","categoria":"Medição","unidade":"un","descricao":"Trena de 20 metros."},
+    {"nome":"Esquadro metálico","categoria":"Medição","unidade":"un","descricao":"Esquadro para conferência de ângulos."},
+    {"nome":"Linha de pedreiro","categoria":"Medição","unidade":"un","descricao":"Linha para alinhamento de alvenaria."},
+    {"nome":"Carretel de linha","categoria":"Medição","unidade":"un","descricao":"Carretel de linha para marcação."},
+    {"nome":"Mangueira de nível","categoria":"Medição","unidade":"m","descricao":"Mangueira para nivelamento hidráulico."},
+    {"nome":"Régua de alumínio 2 m","categoria":"Acabamento","unidade":"un","descricao":"Régua de alumínio para sarrafeamento e conferência."},
+    {"nome":"Sarrafo de madeira","categoria":"Carpintaria","unidade":"un","descricao":"Sarrafo para formas e apoio de obra."},
+    {"nome":"Serrote","categoria":"Carpintaria","unidade":"un","descricao":"Serrote para corte de madeira."},
+    {"nome":"Arco de serra","categoria":"Corte","unidade":"un","descricao":"Arco de serra para cortes manuais."},
+    {"nome":"Alicate universal","categoria":"Ferramentas manuais","unidade":"un","descricao":"Alicate universal."},
+    {"nome":"Alicate de corte","categoria":"Ferramentas manuais","unidade":"un","descricao":"Alicate para corte de fios e arames."},
+    {"nome":"Alicate de bico","categoria":"Ferramentas manuais","unidade":"un","descricao":"Alicate de bico."},
+    {"nome":"Chave de fenda","categoria":"Ferramentas manuais","unidade":"un","descricao":"Chave de fenda."},
+    {"nome":"Chave Phillips","categoria":"Ferramentas manuais","unidade":"un","descricao":"Chave Phillips."},
+    {"nome":"Jogo de chaves combinadas","categoria":"Ferramentas manuais","unidade":"kit","descricao":"Jogo de chaves combinadas."},
+    {"nome":"Chave inglesa","categoria":"Ferramentas manuais","unidade":"un","descricao":"Chave ajustável."},
+    {"nome":"Chave grifo","categoria":"Hidráulica","unidade":"un","descricao":"Chave grifo para conexões hidráulicas."},
+    {"nome":"Cortador de tubo PVC","categoria":"Hidráulica","unidade":"un","descricao":"Cortador manual para tubos PVC."},
+    {"nome":"Serra copo","categoria":"Perfuração","unidade":"kit","descricao":"Conjunto de serras copo para perfurações."},
+    {"nome":"Furadeira elétrica","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Furadeira elétrica para perfuração."},
+    {"nome":"Parafusadeira","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Parafusadeira elétrica."},
+    {"nome":"Martelete perfurador","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Martelete para perfuração em concreto e alvenaria."},
+    {"nome":"Martelo demolidor","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Martelo demolidor para concreto."},
+    {"nome":"Esmerilhadeira","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Esmerilhadeira angular."},
+    {"nome":"Serra circular","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Serra circular para corte de madeira."},
+    {"nome":"Serra mármore","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Serra mármore para corte de pisos e revestimentos."},
+    {"nome":"Lixadeira","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Lixadeira elétrica."},
+    {"nome":"Plaina elétrica","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Plaina elétrica para madeira."},
+    {"nome":"Misturador de argamassa","categoria":"Ferramentas elétricas","unidade":"un","descricao":"Misturador elétrico para argamassa e materiais."},
+    {"nome":"Betoneira","categoria":"Equipamentos","unidade":"un","descricao":"Betoneira para mistura de concreto e argamassa."},
+    {"nome":"Compactador de solo","categoria":"Equipamentos","unidade":"un","descricao":"Compactador para preparação de solo."},
+    {"nome":"Placa vibratória","categoria":"Equipamentos","unidade":"un","descricao":"Placa vibratória para compactação."},
+    {"nome":"Vibrador de concreto","categoria":"Equipamentos","unidade":"un","descricao":"Vibrador para adensamento de concreto."},
+    {"nome":"Andaime tubular","categoria":"Acesso e apoio","unidade":"un","descricao":"Módulo de andaime tubular."},
+    {"nome":"Escada de alumínio","categoria":"Acesso e apoio","unidade":"un","descricao":"Escada de alumínio."},
+    {"nome":"Carrinho de mão","categoria":"Movimentação","unidade":"un","descricao":"Carrinho de mão para transporte de materiais."},
+    {"nome":"Baldes de obra","categoria":"Movimentação","unidade":"un","descricao":"Balde reforçado para obra."},
+    {"nome":"Peneira para areia","categoria":"Ferramentas manuais","unidade":"un","descricao":"Peneira para classificação de agregados."},
+    {"nome":"Desempenadeira de aço","categoria":"Acabamento","unidade":"un","descricao":"Desempenadeira de aço."},
+    {"nome":"Espátula","categoria":"Acabamento","unidade":"un","descricao":"Espátula para aplicação e acabamento."},
+    {"nome":"Raspador","categoria":"Acabamento","unidade":"un","descricao":"Raspador para remoção de resíduos."},
+    {"nome":"Rolo para pintura","categoria":"Pintura","unidade":"un","descricao":"Rolo para aplicação de tinta."},
+    {"nome":"Pincel para pintura","categoria":"Pintura","unidade":"un","descricao":"Pincel para pintura e acabamento."},
+    {"nome":"Bandeja para pintura","categoria":"Pintura","unidade":"un","descricao":"Bandeja para pintura."},
+    {"nome":"Extensor para rolo","categoria":"Pintura","unidade":"un","descricao":"Extensor para pintura em altura."},
+    {"nome":"Aplicador de silicone","categoria":"Acabamento","unidade":"un","descricao":"Aplicador manual de silicone."},
+    {"nome":"Pistola de cola quente","categoria":"Acabamento","unidade":"un","descricao":"Pistola de cola quente."},
+    {"nome":"Grampeador de pressão","categoria":"Fixação","unidade":"un","descricao":"Grampeador manual de pressão."},
+    {"nome":"Extrator de pregos","categoria":"Carpintaria","unidade":"un","descricao":"Extrator de pregos."},
+    {"nome":"Tesoura para chapa","categoria":"Metalurgia","unidade":"un","descricao":"Tesoura manual para corte de chapa."},
+    {"nome":"Curvador de tubo","categoria":"Hidráulica","unidade":"un","descricao":"Ferramenta para curvatura de tubos."},
+    {"nome":"Chave de teste","categoria":"Elétrica","unidade":"un","descricao":"Chave de teste elétrico."},
+    {"nome":"Multímetro","categoria":"Elétrica","unidade":"un","descricao":"Multímetro digital para medições elétricas."},
+    {"nome":"Alicate amperímetro","categoria":"Elétrica","unidade":"un","descricao":"Alicate amperímetro."},
+    {"nome":"Passa-fio","categoria":"Elétrica","unidade":"un","descricao":"Passa-fio para instalação elétrica."},
+    {"nome":"Escada extensível","categoria":"Acesso e apoio","unidade":"un","descricao":"Escada extensível para trabalho em altura."},
+    {"nome":"Cinta para carga","categoria":"Movimentação","unidade":"un","descricao":"Cinta para movimentação e amarração de cargas."},
+    {"nome":"Talha manual","categoria":"Movimentação","unidade":"un","descricao":"Talha manual para içamento."},
+]
+
+# ============================================================
 # FUNÇÕES DO CATÁLOGO
 # ============================================================
 
@@ -4779,13 +4890,41 @@ def catalogo_materiais_por_categoria():
     return categorias
 
 
+def dados_ferramentas_catalogo():
+    return [
+        {
+            "nome": item["nome"],
+            "categoria": item["categoria"],
+            "unidade": item["unidade"],
+            "descricao": item.get("descricao", ""),
+        }
+        for item in FERRAMENTAS_CATALOGO
+    ]
+
+
+def ferramenta_catalogo_por_nome(nome):
+    alvo = normalizar_texto_catalogo(nome)
+    for item in FERRAMENTAS_CATALOGO:
+        if normalizar_texto_catalogo(item["nome"]) == alvo:
+            return item
+    return None
+
+
+def catalogo_ferramentas_por_categoria():
+    categorias = {}
+    for item in FERRAMENTAS_CATALOGO:
+        categorias.setdefault(item["categoria"], []).append(item)
+    return categorias
+
+
 @app.context_processor
 def contexto_catalogo():
 
     return {
         "catalogo_materiais": dados_material_catalogo(),
-        "catalogo_materiais_categorias":
-            catalogo_materiais_por_categoria(),
+        "catalogo_materiais_categorias": catalogo_materiais_por_categoria(),
+        "catalogo_ferramentas": dados_ferramentas_catalogo(),
+        "catalogo_ferramentas_categorias": catalogo_ferramentas_por_categoria(),
     }
 
 
@@ -5214,309 +5353,187 @@ def solicitacoes():
 )
 @empresa_acesso_obrigatorio
 def nova_solicitacao():
+    """Cria uma ou várias solicitações de compra de uma só vez.
 
+    A tela usa os catálogos gerais de construção, e não o estoque atual.
+    Se um item ainda não existir no cadastro da empresa, ele é criado com
+    estoque zero para que a confirmação da compra possa alimentar o estoque.
+    """
     empresa_id = current_user.empresa_id
-
     obras_disponiveis = obras_do_usuario()
 
-    materiais_lista = Material.query.filter_by(
-        empresa_id=empresa_id,
-        ativo=True
-    ).order_by(
-        Material.categoria.asc(),
-        Material.nome.asc()
-    ).all()
-
-    ferramentas_lista = Ferramenta.query.filter_by(
-        empresa_id=empresa_id,
-        ativo=True
-    ).order_by(
-        Ferramenta.categoria.asc(),
-        Ferramenta.nome.asc()
-    ).all()
-
     if request.method == "POST":
-
         try:
-            obra_id = int(
-                request.form.get("obra_id")
-            )
-        except (
-            ValueError,
-            TypeError
-        ):
-            obra_id = None
+            obra_id = int(request.form.get("obra_id") or 0)
+        except (ValueError, TypeError):
+            obra_id = 0
 
-        tipo = (
-            request.form.get("tipo_recurso")
-            or request.form.get("tipo")
-            or "material"
-        ).strip().lower()
+        tipo = (request.form.get("tipo_recurso") or "material").strip().lower()
+        observacao = (request.form.get("observacao") or "").strip()
 
-        recurso_id = request.form.get(
-            "recurso_id"
-        )
+        obra = db.session.get(Obra, obra_id) if obra_id else None
+        if not obra or obra.empresa_id != empresa_id or not usuario_tem_acesso_obra(obra):
+            flash("Selecione uma obra válida e acessível.", "danger")
+            return redirect(url_for("nova_solicitacao"))
 
-        recurso_nome = (
-            request.form.get("recurso_nome")
-            or ""
-        ).strip()
+        if tipo in ("material", "ferramenta"):
+            selecionados = request.form.getlist("recursos")
+            if not selecionados:
+                flash("Marque pelo menos um recurso para solicitar.", "danger")
+                return redirect(url_for("nova_solicitacao"))
 
-        observacao = (
-            request.form.get("observacao")
-            or ""
-        ).strip()
+            criadas = 0
+            erros = []
 
-        try:
-            quantidade = float(
-                request.form.get(
-                    "quantidade",
-                    0
-                )
-                or 0
-            )
-        except (
-            ValueError,
-            TypeError
-        ):
-            quantidade = 0
+            for chave in selecionados:
+                try:
+                    tipo_item, item_id = chave.split(":", 1)
+                    item_id = int(item_id)
+                except (ValueError, TypeError):
+                    erros.append("Um recurso selecionado é inválido.")
+                    continue
 
-        if tipo not in (
-            "material",
-            "ferramenta",
-            "outro"
-        ):
-            flash(
-                "Tipo de solicitação inválido.",
-                "danger"
-            )
+                if tipo_item != tipo:
+                    continue
 
-            return redirect(
-                url_for("nova_solicitacao")
-            )
+                quantidade_raw = request.form.get(f"quantidade_{tipo}_{item_id}")
+                try:
+                    quantidade = float((quantidade_raw or "").replace(",", "."))
+                except (ValueError, TypeError):
+                    quantidade = 0
 
-        obra = None
+                if quantidade <= 0:
+                    erros.append(f"Informe a quantidade de {chave.split(':',1)[0]} selecionado.")
+                    continue
 
-        if obra_id:
-            obra = db.session.get(
-                Obra,
-                obra_id
-            )
+                if tipo == "material":
+                    if item_id < 0 or item_id >= len(MATERIAIS_CATALOGO):
+                        erros.append("Material do catálogo inválido.")
+                        continue
+                    item = MATERIAIS_CATALOGO[item_id]
+                    nome = item["nome"]
+                    material = Material.query.filter(
+                        Material.empresa_id == empresa_id,
+                        db.func.lower(Material.nome) == nome.lower()
+                    ).first()
+                    if not material:
+                        material = Material(
+                            empresa_id=empresa_id,
+                            categoria=item["categoria"],
+                            nome=nome,
+                            descricao=item.get("descricao", ""),
+                            unidade=item.get("unidade", "un"),
+                            estoque_minimo=0,
+                            estoque_atual=0,
+                            ativo=True,
+                        )
+                        db.session.add(material)
+                        db.session.flush()
+                    elif not material.ativo:
+                        material.ativo = True
+                    nova = Solicitacao(
+                        obra_id=obra.id,
+                        material_id=material.id,
+                        ferramenta_id=None,
+                        usuario_id=current_user.id,
+                        quantidade=quantidade,
+                        observacao=observacao,
+                        status="pendente",
+                        tipo_recurso="material",
+                        recurso_nome=material.nome,
+                    )
+                else:
+                    if item_id < 0 or item_id >= len(FERRAMENTAS_CATALOGO):
+                        erros.append("Ferramenta do catálogo inválida.")
+                        continue
+                    item = FERRAMENTAS_CATALOGO[item_id]
+                    nome = item["nome"]
+                    ferramenta = Ferramenta.query.filter(
+                        Ferramenta.empresa_id == empresa_id,
+                        db.func.lower(Ferramenta.nome) == nome.lower()
+                    ).first()
+                    if not ferramenta:
+                        ferramenta = Ferramenta(
+                            empresa_id=empresa_id,
+                            categoria=item["categoria"],
+                            nome=nome,
+                            descricao=item.get("descricao", ""),
+                            unidade=item.get("unidade", "un"),
+                            estoque_minimo=0,
+                            estoque_atual=0,
+                            ativo=True,
+                        )
+                        db.session.add(ferramenta)
+                        db.session.flush()
+                    elif not ferramenta.ativo:
+                        ferramenta.ativo = True
+                    nova = Solicitacao(
+                        obra_id=obra.id,
+                        material_id=None,
+                        ferramenta_id=ferramenta.id,
+                        usuario_id=current_user.id,
+                        quantidade=quantidade,
+                        observacao=observacao,
+                        status="pendente",
+                        tipo_recurso="ferramenta",
+                        recurso_nome=ferramenta.nome,
+                    )
 
-        if not obra:
-            flash(
-                "Selecione uma obra válida.",
-                "danger"
-            )
+                db.session.add(nova)
+                criadas += 1
 
-            return redirect(
-                url_for("nova_solicitacao")
-            )
-
-        if obra.empresa_id != empresa_id:
-            flash(
-                "A obra selecionada não pertence à sua empreiteira.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("nova_solicitacao")
-            )
-
-        if not usuario_tem_acesso_obra(obra):
-            flash(
-                "Você não possui acesso a esta obra.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("nova_solicitacao")
-            )
-
-        if quantidade <= 0:
-            flash(
-                "A quantidade deve ser maior que zero.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("nova_solicitacao")
-            )
-
-        nova = Solicitacao(
-            obra_id=obra.id,
-            usuario_id=current_user.id,
-            quantidade=quantidade,
-            observacao=observacao,
-            status="pendente",
-            tipo_recurso=tipo,
-            recurso_nome=recurso_nome or None,
-        )
-
-        # ----------------------------------------------------
-        # MATERIAL
-        # ----------------------------------------------------
-
-        if tipo == "material":
-
-            if not recurso_id:
-                flash(
-                    "Selecione um material.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
+            if erros:
+                db.session.rollback()
+                flash(" ".join(erros), "danger")
+                return redirect(url_for("nova_solicitacao"))
 
             try:
-                recurso_id = int(recurso_id)
-            except (
-                ValueError,
-                TypeError
-            ):
-                flash(
-                    "Material inválido.",
-                    "danger"
-                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                logging.exception("Erro ao criar solicitações em lote")
+                flash("Não foi possível enviar as solicitações.", "danger")
+                return redirect(url_for("nova_solicitacao"))
 
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
+            flash(f"{criadas} solicitação(ões) enviada(s) para compra.", "success")
+            return redirect(url_for("solicitacoes"))
 
-            material = db.session.get(
-                Material,
-                recurso_id
-            )
-
-            if (
-                not material
-                or not material.ativo
-                or material.empresa_id != empresa_id
-            ):
-                flash(
-                    "Material não encontrado.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
-
-            nova.material_id = material.id
-            nova.ferramenta_id = None
-            nova.recurso_nome = material.nome
-
-        # ----------------------------------------------------
-        # FERRAMENTA
-        # ----------------------------------------------------
-
-        elif tipo == "ferramenta":
-
-            if not recurso_id:
-                flash(
-                    "Selecione uma ferramenta.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
-
+        if tipo == "outro":
+            recurso_nome = (request.form.get("recurso_nome") or "").strip()
             try:
-                recurso_id = int(recurso_id)
-            except (
-                ValueError,
-                TypeError
-            ):
-                flash(
-                    "Ferramenta inválida.",
-                    "danger"
-                )
+                quantidade = float((request.form.get("quantidade") or "").replace(",", "."))
+            except (ValueError, TypeError):
+                quantidade = 0
+            if not recurso_nome or quantidade <= 0:
+                flash("Informe o recurso e uma quantidade válida.", "danger")
+                return redirect(url_for("nova_solicitacao"))
+            db.session.add(Solicitacao(
+                obra_id=obra.id,
+                usuario_id=current_user.id,
+                quantidade=quantidade,
+                observacao=observacao,
+                status="pendente",
+                tipo_recurso="outro",
+                recurso_nome=recurso_nome,
+            ))
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                logging.exception("Erro ao criar solicitação genérica")
+                flash("Não foi possível enviar a solicitação.", "danger")
+                return redirect(url_for("nova_solicitacao"))
+            flash("Solicitação enviada para compra.", "success")
+            return redirect(url_for("solicitacoes"))
 
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
-
-            ferramenta = db.session.get(
-                Ferramenta,
-                recurso_id
-            )
-
-            if (
-                not ferramenta
-                or not ferramenta.ativo
-                or ferramenta.empresa_id != empresa_id
-            ):
-                flash(
-                    "Ferramenta não encontrada.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
-
-            nova.ferramenta_id = ferramenta.id
-            nova.material_id = None
-            nova.recurso_nome = ferramenta.nome
-
-        # ----------------------------------------------------
-        # OUTRO
-        # ----------------------------------------------------
-
-        else:
-
-            if not recurso_nome:
-                flash(
-                    "Informe o nome do recurso solicitado.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("nova_solicitacao")
-                )
-
-            nova.material_id = None
-            nova.ferramenta_id = None
-
-        db.session.add(nova)
-
-        try:
-
-            db.session.commit()
-
-        except Exception:
-
-            db.session.rollback()
-
-            logging.exception(
-                "Erro ao criar solicitação"
-            )
-
-            flash(
-                "Não foi possível enviar a solicitação.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("nova_solicitacao")
-            )
-
-        flash(
-            "Solicitação enviada para aprovação.",
-            "success"
-        )
-
-        return redirect(
-            url_for("solicitacoes")
-        )
+        flash("Tipo de solicitação inválido.", "danger")
+        return redirect(url_for("nova_solicitacao"))
 
     return render_template(
         "solicitacao_form.html",
         obras=obras_disponiveis,
-        materiais=materiais_lista,
-        ferramentas=ferramentas_lista,
+        catalogo_materiais=dados_material_catalogo(),
+        catalogo_ferramentas=dados_ferramentas_catalogo(),
         tipos_solicitacao=TIPOS_SOLICITACAO,
     )
 
@@ -6050,13 +6067,11 @@ def nova_ferramenta():
 
     if request.method == "POST":
 
-        categoria = (
-            request.form.get("categoria")
-            or ""
-        ).strip()
+        nome = (request.form.get("nome") or "").strip()
+        catalogo = ferramenta_catalogo_por_nome(nome)
 
-        nome = (
-            request.form.get("nome")
+        categoria = (
+            catalogo["categoria"] if catalogo else request.form.get("categoria")
             or ""
         ).strip()
 
@@ -6066,9 +6081,12 @@ def nova_ferramenta():
         ).strip()
 
         unidade = (
-            request.form.get("unidade")
+            catalogo["unidade"] if catalogo else request.form.get("unidade")
             or "un"
         ).strip()
+
+        if catalogo:
+            descricao = catalogo.get("descricao", "")
 
         try:
 
