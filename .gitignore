@@ -1,14 +1,6 @@
 __pycache__/
-*.py[cod]
+*.pyc
 .venv/
-venv/
 .env
-.env.*
-!.env.example
-instance/
 *.db
-*.sqlite
-*.sqlite3
-.vscode/
-.idea/
-.DS_Store
+instance/
