@@ -86,6 +86,17 @@
       </div>
 
       <div id="semResultados" class="alert alert-light border d-none mt-3 mb-0">Nenhum item encontrado.</div>
+
+      <div class="border rounded-3 p-3 mt-4 bg-light" id="blocoManual">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <div>
+            <h3 class="h6 mb-1">Não encontrou o item?</h3>
+            <div class="small text-muted">Digite qualquer material ou ferramenta que não esteja no catálogo. Ele será cadastrado e enviado para compra.</div>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="adicionarManual">+ Adicionar item</button>
+        </div>
+        <div id="itensManuais"></div>
+      </div>
     </div>
   </div>
 
@@ -126,9 +137,59 @@
   const marcarTodos = document.getElementById('marcarTodos');
   const titulo = document.getElementById('tituloRecursos');
   const sem = document.getElementById('semResultados');
+  const itensManuais = document.getElementById('itensManuais');
+  const adicionarManual = document.getElementById('adicionarManual');
 
   function cardsAtuais(){
     return [...document.querySelectorAll('.resource-card[data-tipo="'+tipo.value+'"]')];
+  }
+
+  function criarLinhaManual(){
+    const linha = document.createElement('div');
+    linha.className = 'row g-2 align-items-end mb-2 item-manual';
+    linha.innerHTML = `
+      <div class="col-12 col-md-5">
+        <label class="form-label small fw-semibold">Nome do item</label>
+        <input type="text" class="form-control" name="custom_nome[]" placeholder="Ex.: Tela soldada, disco de corte...">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-semibold">Quantidade</label>
+        <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control" name="custom_quantidade[]" placeholder="Ex.: 2">
+      </div>
+      <div class="col-6 col-md-3 unidade-manual-wrap">
+        <label class="form-label small fw-semibold">Unidade</label>
+        <select class="form-select" name="custom_unidade[]">
+          <option value="un">unidade</option>
+          <option value="m">metro</option>
+          <option value="m²">metro²</option>
+          <option value="kg">kg</option>
+          <option value="L">litro</option>
+          <option value="saco">saco</option>
+          <option value="pacote">pacote</option>
+          <option value="kit">kit</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <button type="button" class="btn btn-outline-danger w-100 remover-manual">Remover</button>
+      </div>`;
+    itensManuais.appendChild(linha);
+    atualizarUnidadesManuais();
+    linha.querySelector('input[name="custom_nome[]"]').focus();
+  }
+
+  function atualizarUnidadesManuais(){
+    document.querySelectorAll('.item-manual').forEach(linha => {
+      const wrap = linha.querySelector('.unidade-manual-wrap');
+      const select = linha.querySelector('select[name="custom_unidade[]"]');
+      if(tipo.value === 'ferramenta'){
+        select.value = 'un';
+        select.disabled = true;
+        wrap.querySelector('label').textContent = 'Unidade';
+      } else {
+        select.disabled = false;
+        wrap.querySelector('label').textContent = 'Unidade';
+      }
+    });
   }
 
   function atualizar(){
@@ -139,6 +200,8 @@
     materiais.classList.toggle('d-none', tipo.value !== 'material');
     ferramentas.classList.toggle('d-none', tipo.value !== 'ferramenta');
     titulo.textContent = tipo.value === 'material' ? 'Materiais para comprar' : 'Ferramentas para comprar';
+    busca.placeholder = tipo.value === 'material' ? 'Pesquisar material...' : 'Pesquisar ferramenta...';
+    atualizarUnidadesManuais();
     filtrar();
   }
 
@@ -174,6 +237,12 @@
       if(marcar && (!qty.value || Number(qty.value) <= 0)) qty.value = '1';
     });
     marcarTodos.textContent = marcar ? 'Desmarcar todos' : 'Marcar todos';
+  });
+
+  adicionarManual.addEventListener('click', criarLinhaManual);
+  itensManuais.addEventListener('click', (event) => {
+    const btn = event.target.closest('.remover-manual');
+    if(btn) btn.closest('.item-manual').remove();
   });
 
   busca.addEventListener('input', filtrar);

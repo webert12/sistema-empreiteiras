@@ -4,91 +4,142 @@
 <div class="page-head">
   <div>
     <h1 class="h3 mb-1">{{ titulo }}</h1>
-    {% if modo_lote|default(false) %}
-      <p class="text-muted mb-0">Selecione vários materiais por categoria e informe a quantidade inicial de cada um.</p>
-    {% else %}
-      <p class="text-muted mb-0">Edite o material selecionado.</p>
-    {% endif %}
+    <p class="text-muted mb-0">Marque o material no catálogo. A categoria, unidade e descrição são preenchidas automaticamente.</p>
   </div>
   <a class="btn btn-outline-secondary" href="{{ url_for('materiais') }}">Voltar</a>
 </div>
 
-{% if modo_lote|default(false) %}
-<form method="post" id="formMateriaisLote">
+<form method="post" id="formMaterial">
+  <input type="hidden" name="nome" id="nomeMaterial" value="{{ material.nome if material else '' }}">
   <div class="card shadow-sm">
     <div class="card-header bg-white">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
           <h2 class="h5 mb-1">Catálogo de materiais</h2>
-          <div class="small text-muted">Marque um ou vários itens. A categoria e a unidade já vêm do catálogo.</div>
+          <div class="small text-muted">Selecione um item. Não é necessário digitar o nome.</div>
         </div>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="marcarTodosMateriais">Marcar todos</button>
+        <input type="search" class="form-control" style="max-width:320px" id="buscarMaterial" placeholder="Pesquisar material...">
       </div>
-      <input type="search" class="form-control mt-3" id="buscarMaterial" placeholder="Pesquisar material ou categoria...">
     </div>
     <div class="card-body">
-      {% for categoria, itens in catalogo_materiais_categorias.items() %}
-      <section class="catalog-category material-category" data-category="{{ categoria|lower }}">
-        <div class="catalog-category-title">{{ categoria }}</div>
-        <div class="catalog-grid">
-          {% for item in itens %}
-          {% set idx = loop.index0 + (catalogo_materiais[:loop.index0]|length if false else 0) %}
-          {% set global_index = namespace(value=0) %}
-          {% for all_item in catalogo_materiais %}
-            {% if all_item.nome == item.nome %}{% set global_index.value = loop.index0 %}{% endif %}
-          {% endfor %}
-          <div class="resource-card catalog-item-card" data-search="{{ (item.nome ~ ' ' ~ categoria)|lower }}">
-            <div class="resource-main">
-              <input class="form-check-input recurso-material-check" type="checkbox" name="recursos" value="material:{{ global_index.value }}" id="material_{{ global_index.value }}">
-              <label class="resource-label" for="material_{{ global_index.value }}">
-                <strong>{{ item.nome }}</strong>
-                <span>{{ item.unidade }} · {{ item.descricao }}</span>
+      <div class="catalog-grid" id="listaCatalogoMaterial">
+        {% for categoria, itens in catalogo_materiais_categorias.items() %}
+          <div class="catalog-category" data-category="{{ categoria|lower }}">
+            <div class="catalog-category-title">{{ categoria }}</div>
+            {% for item in itens %}
+              {% set selecionado = material and material.nome|lower == item.nome|lower %}
+              <label class="catalog-select-card" data-search="{{ (item.nome ~ ' ' ~ categoria)|lower }}">
+                <input type="radio" name="catalogo_item" value="{{ item.nome }}" data-categoria="{{ item.categoria }}" data-unidade="{{ item.unidade }}" data-descricao="{{ item.descricao|e }}" {% if selecionado %}checked{% endif %}>
+                <span class="catalog-radio"></span>
+                <span class="catalog-select-text">
+                  <strong>{{ item.nome }}</strong>
+                  <small>{{ item.unidade }} · {{ item.descricao }}</small>
+                </span>
               </label>
-            </div>
-            <div class="resource-qty">
-              <label for="qmaterial_{{ global_index.value }}">Quantidade ({{ item.unidade }})</label>
-              <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control form-control-sm quantidade-material" name="quantidade_material_{{ global_index.value }}" id="qmaterial_{{ global_index.value }}" value="1" disabled>
-            </div>
+            {% endfor %}
           </div>
-          {% endfor %}
+        {% endfor %}
+        <label class="catalog-select-card custom-option">
+          <input type="radio" name="catalogo_item" value="__outro__" id="materialOutro">
+          <span class="catalog-radio"></span>
+          <span class="catalog-select-text"><strong>Outro material</strong><small>Use esta opção somente se o material não estiver no catálogo.</small></span>
+        </label>
+      </div>
+      <div id="campoOutro" class="row g-3 mt-2 d-none">
+        <div class="col-md-8">
+          <label class="form-label">Nome do material *</label>
+          <input class="form-control" id="nomeOutro" placeholder="Digite o nome do material">
         </div>
-      </section>
-      {% endfor %}
-      <div id="semMateriais" class="alert alert-light border d-none mt-3 mb-0">Nenhum material encontrado.</div>
+        <div class="col-md-4">
+          <label class="form-label">Unidade</label>
+          <select class="form-select" id="unidadeOutro">
+            <option value="un">unidade</option><option value="m">metro</option><option value="m²">metro²</option><option value="kg">kg</option><option value="L">litro</option><option value="saco">saco</option><option value="kit">kit</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="card shadow-sm mt-3"><div class="card-body d-flex flex-wrap gap-2">
-    <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-plus-circle"></i> Adicionar materiais selecionados</button>
-    <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('materiais') }}">Cancelar</a>
-  </div></div>
-</form>
-{% else %}
-<form method="post">
-  <input type="hidden" name="nome" value="{{ material.nome }}">
-  <div class="card shadow-sm"><div class="card-body">
-    <div class="row g-3">
-      <div class="col-md-5"><label class="form-label fw-semibold">Material</label><input class="form-control" value="{{ material.nome }}" readonly></div>
-      <div class="col-md-3"><label class="form-label fw-semibold">Categoria</label><input class="form-control" name="categoria" value="{{ material.categoria }}" readonly></div>
-      <div class="col-md-2"><label class="form-label fw-semibold">Unidade</label><input class="form-control" name="unidade" value="{{ material.unidade }}" readonly></div>
-      <div class="col-md-2"><label class="form-label fw-semibold">Estoque mínimo</label><input type="number" min="0" step="0.01" class="form-control" name="estoque_minimo" value="{{ material.estoque_minimo|quantidade }}"></div>
-      <div class="col-12"><label class="form-label fw-semibold">Descrição</label><textarea class="form-control" rows="3" name="descricao" readonly>{{ material.descricao or '' }}</textarea></div>
+
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label fw-semibold">Categoria</label>
+          <input class="form-control" name="categoria" id="categoriaMaterial" value="{{ material.categoria if material else '' }}" readonly>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Unidade</label>
+          <input class="form-control" name="unidade" id="unidadeMaterial" value="{{ material.unidade if material else 'un' }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Estoque mínimo</label>
+          <input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" name="estoque_minimo" value="{{ material.estoque_minimo|quantidade if material else '0' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Descrição</label>
+          <textarea class="form-control" rows="3" name="descricao" id="descricaoMaterial" readonly>{{ material.descricao if material else '' }}</textarea>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-lg mt-4" type="submit"><i class="bi bi-check2-circle"></i> Salvar material</button>
     </div>
-    <button class="btn btn-primary btn-lg mt-4" type="submit">Salvar alterações</button>
-  </div></div>
+  </div>
 </form>
-{% endif %}
 {% endblock %}
 {% block scripts %}
-{% if modo_lote|default(false) %}
 <script>
 (function(){
-  const busca=document.getElementById('buscarMaterial');
-  const marcar=document.getElementById('marcarTodosMateriais');
-  function cards(){return [...document.querySelectorAll('.material-category .catalog-item-card')].filter(c=>!c.classList.contains('d-none'));}
-  document.querySelectorAll('.recurso-material-check').forEach(ch=>ch.addEventListener('change',()=>{const q=ch.closest('.resource-card').querySelector('.quantidade-material');q.disabled=!ch.checked;if(ch.checked&&(!q.value||Number(q.value)<=0))q.value='1';}));
-  marcar.addEventListener('click',()=>{const cs=cards();const marcarAgora=cs.some(c=>!c.querySelector('.recurso-material-check').checked);cs.forEach(c=>{const ch=c.querySelector('.recurso-material-check'),q=c.querySelector('.quantidade-material');ch.checked=marcarAgora;q.disabled=!marcarAgora;if(marcarAgora&&!q.value)q.value='1';});marcar.textContent=marcarAgora?'Desmarcar todos':'Marcar todos';});
-  busca.addEventListener('input',()=>{const t=busca.value.trim().toLowerCase();let total=0;document.querySelectorAll('.material-category').forEach(cat=>{let n=0;cat.querySelectorAll('.catalog-item-card').forEach(card=>{const ok=!t||card.dataset.search.includes(t);card.classList.toggle('d-none',!ok);if(ok)n++;});cat.classList.toggle('d-none',n===0);total+=n;});document.getElementById('semMateriais').classList.toggle('d-none',total!==0);});
+  const nome = document.getElementById('nomeMaterial');
+  const categoria = document.getElementById('categoriaMaterial');
+  const unidade = document.getElementById('unidadeMaterial');
+  const descricao = document.getElementById('descricaoMaterial');
+  const outro = document.getElementById('materialOutro');
+  const campoOutro = document.getElementById('campoOutro');
+  const nomeOutro = document.getElementById('nomeOutro');
+  const unidadeOutro = document.getElementById('unidadeOutro');
+  const busca = document.getElementById('buscarMaterial');
+
+  function selecionar(item){
+    const isOutro = item && item.value === '__outro__';
+    campoOutro.classList.toggle('d-none', !isOutro);
+    if(isOutro){
+      nome.value = nomeOutro.value;
+      categoria.value = 'Outros';
+      unidade.value = unidadeOutro.value;
+      descricao.value = '';
+    } else if(item){
+      nome.value = item.value;
+      categoria.value = item.dataset.categoria || '';
+      unidade.value = item.dataset.unidade || 'un';
+      descricao.value = item.dataset.descricao || '';
+    }
+  }
+
+  document.querySelectorAll('input[name="catalogo_item"]').forEach(r => r.addEventListener('change', () => selecionar(r)));
+  nomeOutro.addEventListener('input', () => { if(outro.checked) nome.value = nomeOutro.value; });
+  unidadeOutro.addEventListener('change', () => { if(outro.checked) unidade.value = unidadeOutro.value; });
+
+  {% if material and not catalogo_materiais|selectattr('nome','equalto',material.nome)|list %}
+    outro.checked = true;
+    nomeOutro.value = {{ material.nome|tojson }};
+    unidadeOutro.value = {{ material.unidade|tojson }};
+    selecionar(outro);
+  {% else %}
+    const marcado = document.querySelector('input[name="catalogo_item"]:checked');
+    if(marcado) selecionar(marcado);
+  {% endif %}
+
+  busca.addEventListener('input', () => {
+    const termo = busca.value.trim().toLowerCase();
+    document.querySelectorAll('.catalog-category').forEach(cat => {
+      let visible = 0;
+      cat.querySelectorAll('.catalog-select-card').forEach(card => {
+        const ok = !termo || card.dataset.search.includes(termo);
+        card.classList.toggle('d-none', !ok);
+        if(ok) visible++;
+      });
+      cat.classList.toggle('d-none', visible === 0);
+    });
+  });
 })();
 </script>
-{% endif %}
 {% endblock %}
