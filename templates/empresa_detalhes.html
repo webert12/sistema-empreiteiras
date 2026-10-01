@@ -49,7 +49,7 @@
 
         <div class="d-flex flex-wrap gap-2">
 
-            <a href="{{ url_for('admin_editar_empresa', empresa_id=empresa.id) }}"
+            <a href="{{ url_for('editar_empresa', empresa_id=empresa.id) }}"
                class="btn btn-outline-primary">
 
                 <i class="bi bi-pencil"></i>
@@ -59,7 +59,7 @@
 
 
             <form method="POST"
-                  action="{{ url_for('admin_alternar_status_empresa', empresa_id=empresa.id) }}"
+                  action="{{ url_for('alternar_status_empresa', empresa_id=empresa.id) }}"
                   class="d-inline">
 
                 {% if empresa.ativo %}
@@ -470,7 +470,7 @@
 
                 {% if empresa.ativo %}
 
-                    <a href="{{ url_for('admin_novo_usuario_empresa', empresa_id=empresa.id) }}"
+                    <a href="{{ url_for('novo_administrador_empresa', empresa_id=empresa.id) }}"
                        class="btn btn-primary">
 
                         <i class="bi bi-person-plus"></i>
@@ -622,7 +622,7 @@
 
                                         <form method="POST"
                                               action="{{ url_for(
-                                                  'admin_alternar_status_usuario_empresa',
+                                                  'alternar_status_administrador_empresa',
                                                   empresa_id=empresa.id,
                                                   usuario_id=usuario.id
                                               ) }}"
@@ -687,7 +687,7 @@
 
                     {% if empresa.ativo %}
 
-                        <a href="{{ url_for('admin_novo_usuario_empresa', empresa_id=empresa.id) }}"
+                        <a href="{{ url_for('novo_administrador_empresa', empresa_id=empresa.id) }}"
                            class="btn btn-primary">
 
                             <i class="bi bi-person-plus"></i>

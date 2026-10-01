@@ -1,253 +1,39 @@
 {% extends 'base.html' %}
 {% block title %}Nova solicitação{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1 class="h3 mb-1">Nova solicitação</h1>
-    <p class="text-muted mb-0">Escolha a obra, o tipo e marque um ou vários itens que precisam ser comprados. O estoque atual não limita esta lista.</p>
-  </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('solicitacoes') }}">Voltar</a>
-</div>
-
-<form method="post" id="formSolicitacao">
-  <div class="card shadow-sm mb-3">
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <label class="form-label fw-semibold">Obra *</label>
-          <select class="form-select form-select-lg" name="obra_id" required>
-            <option value="">Selecione a obra</option>
-            {% for obra in obras %}
-              <option value="{{ obra.id }}">{{ obra.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label fw-semibold">Tipo *</label>
-          <select class="form-select form-select-lg" name="tipo_recurso" id="tipoRecurso" required>
-            <option value="material">Material</option>
-            <option value="ferramenta">Ferramenta</option>
-            <option value="outro">Outro</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="page-head"><div><h1 class="h3 mb-1">Nova solicitação</h1><p class="text-muted mb-0">Informe a obra e os itens que precisam ser comprados. O estoque atual não limita o pedido.</p></div><a class="btn btn-outline-secondary" href="{{ url_for('solicitacoes') }}">Voltar</a></div>
+<form method="post" id="formSolicitacao" novalidate>
+  <div class="card shadow-sm mb-3"><div class="card-body"><div class="row g-3">
+    <div class="col-12 col-md-6"><label class="form-label fw-semibold">Obra *</label><select class="form-select form-select-lg" name="obra_id" required><option value="">Selecione a obra</option>{% for obra in obras %}<option value="{{ obra.id }}">{{ obra.nome }}</option>{% endfor %}</select></div>
+    <div class="col-12 col-md-6"><label class="form-label fw-semibold">Tipo *</label><select class="form-select form-select-lg" name="tipo_recurso" id="tipoRecurso"><option value="material">Material</option><option value="ferramenta">Ferramenta</option><option value="outro">Outro</option></select></div>
+  </div></div></div>
 
   <div class="card shadow-sm" id="blocoCatalogo">
-    <div class="card-header bg-white py-3">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div>
-          <h2 class="h5 mb-1" id="tituloRecursos">Materiais para comprar</h2>
-          <div class="small text-muted">Marque quantos itens quiser. O sistema criará uma solicitação separada para cada item marcado.</div>
-        </div>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="marcarTodos">Marcar todos</button>
-      </div>
-      <div class="mt-3">
-        <input type="search" class="form-control" id="buscarRecurso" placeholder="Pesquisar material ou ferramenta...">
-      </div>
-    </div>
-
+    <div class="card-header bg-white py-3"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h2 class="h5 mb-1" id="tituloRecursos">Materiais para comprar</h2><div class="small text-muted">Marque vários itens. Cada item será enviado como uma solicitação de compra.</div></div><button type="button" class="btn btn-outline-primary btn-sm" id="marcarTodos">Marcar todos</button></div><input type="search" class="form-control mt-3" id="buscarRecurso" placeholder="Pesquisar material..."></div>
     <div class="card-body">
-      <div id="listaMateriais" class="catalog-grid">
-        {% for item in catalogo_materiais %}
-        <div class="resource-card" data-tipo="material" data-search="{{ (item.nome ~ ' ' ~ item.categoria)|lower }}">
-          <div class="resource-main">
-            <input class="form-check-input recurso-check" type="checkbox" name="recursos" value="material:{{ loop.index0 }}" id="mat{{ loop.index0 }}">
-            <label class="resource-label" for="mat{{ loop.index0 }}">
-              <strong>{{ item.nome }}</strong>
-              <span>{{ item.categoria }} · {{ item.unidade }}</span>
-            </label>
-          </div>
-          <div class="resource-qty">
-            <label for="qmat{{ loop.index0 }}">Qtd.</label>
-            <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control form-control-sm quantidade-item" name="quantidade_material_{{ loop.index0 }}" id="qmat{{ loop.index0 }}" value="1" disabled>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
+      <div id="listaMateriais" class="catalog-grid">{% for item in catalogo_materiais %}<div class="resource-card" data-tipo="material" data-search="{{ (item.nome ~ ' ' ~ item.categoria)|lower }}"><div class="resource-main"><input class="form-check-input recurso-check" type="checkbox" name="recursos" value="material:{{ loop.index0 }}" id="mat{{ loop.index0 }}"><label class="resource-label" for="mat{{ loop.index0 }}"><strong>{{ item.nome }}</strong><span>{{ item.categoria }} · {{ item.unidade }}</span></label></div><div class="resource-qty"><label for="qmat{{ loop.index0 }}">Qtd.</label><input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control form-control-sm quantidade-item" name="quantidade_material_{{ loop.index0 }}" id="qmat{{ loop.index0 }}" value="1"></div></div>{% endfor %}</div>
+      <div id="listaFerramentas" class="catalog-grid d-none">{% for item in catalogo_ferramentas %}<div class="resource-card" data-tipo="ferramenta" data-search="{{ (item.nome ~ ' ' ~ item.categoria)|lower }}"><div class="resource-main"><input class="form-check-input recurso-check" type="checkbox" name="recursos" value="ferramenta:{{ loop.index0 }}" id="fer{{ loop.index0 }}"><label class="resource-label" for="fer{{ loop.index0 }}"><strong>{{ item.nome }}</strong><span>{{ item.categoria }} · {{ item.unidade }}</span></label></div><div class="resource-qty"><label for="qfer{{ loop.index0 }}">Qtd.</label><input type="number" min="1" step="1" inputmode="numeric" class="form-control form-control-sm quantidade-item" name="quantidade_ferramenta_{{ loop.index0 }}" id="qfer{{ loop.index0 }}" value="1"></div></div>{% endfor %}</div>
+      <div id="semResultados" class="alert alert-light border d-none mt-3">Nenhum item encontrado no catálogo.</div>
 
-      <div id="listaFerramentas" class="catalog-grid d-none">
-        {% for item in catalogo_ferramentas %}
-        <div class="resource-card" data-tipo="ferramenta" data-search="{{ (item.nome ~ ' ' ~ item.categoria)|lower }}">
-          <div class="resource-main">
-            <input class="form-check-input recurso-check" type="checkbox" name="recursos" value="ferramenta:{{ loop.index0 }}" id="fer{{ loop.index0 }}">
-            <label class="resource-label" for="fer{{ loop.index0 }}">
-              <strong>{{ item.nome }}</strong>
-              <span>{{ item.categoria }} · {{ item.unidade }}</span>
-            </label>
-          </div>
-          <div class="resource-qty">
-            <label for="qfer{{ loop.index0 }}">Qtd.</label>
-            <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control form-control-sm quantidade-item" name="quantidade_ferramenta_{{ loop.index0 }}" id="qfer{{ loop.index0 }}" value="1" disabled>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-
-      <div id="semResultados" class="alert alert-light border d-none mt-3 mb-0">Nenhum item encontrado.</div>
-
-      <div class="border rounded-3 p-3 mt-4 bg-light" id="blocoManual">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-          <div>
-            <h3 class="h6 mb-1">Não encontrou o item?</h3>
-            <div class="small text-muted">Digite qualquer material ou ferramenta que não esteja no catálogo. Ele será cadastrado e enviado para compra.</div>
-          </div>
-          <button type="button" class="btn btn-outline-primary btn-sm" id="adicionarManual">+ Adicionar item</button>
-        </div>
-        <div id="itensManuais"></div>
+      <div class="border rounded-3 p-3 mt-4 bg-light" id="blocoManual"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2"><div><h3 class="h6 mb-1">Não encontrou no catálogo?</h3><div class="small text-muted">Digite qualquer material ou ferramenta. O sistema cadastra o item automaticamente e envia a solicitação para compra.</div></div><button type="button" class="btn btn-primary btn-sm" id="adicionarManual">+ Adicionar outro item</button></div>
+        <div id="itensManuais"><div class="row g-2 align-items-end mb-2 item-manual"><div class="col-12 col-md-5"><label class="form-label small fw-semibold">Nome do item</label><input type="text" class="form-control" name="custom_nome[]" placeholder="Ex.: Tela soldada, disco de corte..."></div><div class="col-6 col-md-2"><label class="form-label small fw-semibold">Quantidade</label><input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control" name="custom_quantidade[]" placeholder="Ex.: 2"></div><div class="col-6 col-md-3 unidade-manual-wrap"><label class="form-label small fw-semibold">Unidade</label><select class="form-select" name="custom_unidade[]"><option value="un">unidade</option><option value="m">metro</option><option value="m²">metro²</option><option value="kg">kg</option><option value="L">litro</option><option value="saco">saco</option><option value="pacote">pacote</option><option value="kit">kit</option></select></div><div class="col-12 col-md-2"><button type="button" class="btn btn-outline-danger w-100 remover-manual">Remover</button></div></div></div>
       </div>
     </div>
   </div>
 
-  <div class="card shadow-sm mt-3 d-none" id="blocoOutro">
-    <div class="card-body">
-      <label class="form-label fw-semibold">O que precisa ser comprado? *</label>
-      <input class="form-control" name="recurso_nome" placeholder="Ex.: serviço de caminhão, locação, peça específica">
-      <div class="row mt-2">
-        <div class="col-md-4">
-          <label class="form-label">Quantidade *</label>
-          <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control" name="quantidade" value="1">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card shadow-sm mt-3">
-    <div class="card-body">
-      <label class="form-label fw-semibold">Observação</label>
-      <textarea class="form-control" rows="3" name="observacao" placeholder="Ex.: usar na fundação da casa, entrega até sexta-feira..."></textarea>
-      <div class="d-flex flex-wrap gap-2 mt-4">
-        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send"></i> Enviar solicitação</button>
-        <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('solicitacoes') }}">Cancelar</a>
-      </div>
-    </div>
-  </div>
+  <div class="card shadow-sm mt-3 d-none" id="blocoOutro"><div class="card-body"><label class="form-label fw-semibold">O que precisa ser comprado? *</label><input class="form-control" name="recurso_nome" placeholder="Ex.: locação, serviço, peça específica"><div class="row mt-2"><div class="col-md-4"><label class="form-label">Quantidade *</label><input type="number" min="0.01" step="0.01" class="form-control" name="quantidade"></div></div></div></div>
+  <div class="card shadow-sm mt-3"><div class="card-body"><label class="form-label fw-semibold">Observação</label><textarea class="form-control" rows="3" name="observacao" placeholder="Ex.: usar na fundação, entregar até sexta-feira..."></textarea><div class="d-flex gap-2 mt-4"><button class="btn btn-primary btn-lg" type="submit">Enviar solicitação</button><a class="btn btn-outline-secondary btn-lg" href="{{ url_for('solicitacoes') }}">Cancelar</a></div></div></div>
 </form>
 {% endblock %}
-{% block scripts %}
-<script>
-(function(){
-  const tipo = document.getElementById('tipoRecurso');
-  const materiais = document.getElementById('listaMateriais');
-  const ferramentas = document.getElementById('listaFerramentas');
-  const outro = document.getElementById('blocoOutro');
-  const catalogo = document.getElementById('blocoCatalogo');
-  const busca = document.getElementById('buscarRecurso');
-  const marcarTodos = document.getElementById('marcarTodos');
-  const titulo = document.getElementById('tituloRecursos');
-  const sem = document.getElementById('semResultados');
-  const itensManuais = document.getElementById('itensManuais');
-  const adicionarManual = document.getElementById('adicionarManual');
-
-  function cardsAtuais(){
-    return [...document.querySelectorAll('.resource-card[data-tipo="'+tipo.value+'"]')];
-  }
-
-  function criarLinhaManual(){
-    const linha = document.createElement('div');
-    linha.className = 'row g-2 align-items-end mb-2 item-manual';
-    linha.innerHTML = `
-      <div class="col-12 col-md-5">
-        <label class="form-label small fw-semibold">Nome do item</label>
-        <input type="text" class="form-control" name="custom_nome[]" placeholder="Ex.: Tela soldada, disco de corte...">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small fw-semibold">Quantidade</label>
-        <input type="number" min="0.01" step="0.01" inputmode="decimal" class="form-control" name="custom_quantidade[]" placeholder="Ex.: 2">
-      </div>
-      <div class="col-6 col-md-3 unidade-manual-wrap">
-        <label class="form-label small fw-semibold">Unidade</label>
-        <select class="form-select" name="custom_unidade[]">
-          <option value="un">unidade</option>
-          <option value="m">metro</option>
-          <option value="m²">metro²</option>
-          <option value="kg">kg</option>
-          <option value="L">litro</option>
-          <option value="saco">saco</option>
-          <option value="pacote">pacote</option>
-          <option value="kit">kit</option>
-        </select>
-      </div>
-      <div class="col-12 col-md-2">
-        <button type="button" class="btn btn-outline-danger w-100 remover-manual">Remover</button>
-      </div>`;
-    itensManuais.appendChild(linha);
-    atualizarUnidadesManuais();
-    linha.querySelector('input[name="custom_nome[]"]').focus();
-  }
-
-  function atualizarUnidadesManuais(){
-    document.querySelectorAll('.item-manual').forEach(linha => {
-      const wrap = linha.querySelector('.unidade-manual-wrap');
-      const select = linha.querySelector('select[name="custom_unidade[]"]');
-      if(tipo.value === 'ferramenta'){
-        select.value = 'un';
-        select.disabled = true;
-        wrap.querySelector('label').textContent = 'Unidade';
-      } else {
-        select.disabled = false;
-        wrap.querySelector('label').textContent = 'Unidade';
-      }
-    });
-  }
-
-  function atualizar(){
-    const isOutro = tipo.value === 'outro';
-    catalogo.classList.toggle('d-none', isOutro);
-    outro.classList.toggle('d-none', !isOutro);
-    if(isOutro) return;
-    materiais.classList.toggle('d-none', tipo.value !== 'material');
-    ferramentas.classList.toggle('d-none', tipo.value !== 'ferramenta');
-    titulo.textContent = tipo.value === 'material' ? 'Materiais para comprar' : 'Ferramentas para comprar';
-    busca.placeholder = tipo.value === 'material' ? 'Pesquisar material...' : 'Pesquisar ferramenta...';
-    atualizarUnidadesManuais();
-    filtrar();
-  }
-
-  function filtrar(){
-    if(tipo.value === 'outro') return;
-    const termo = (busca.value || '').trim().toLowerCase();
-    const cards = cardsAtuais();
-    let visiveis = 0;
-    cards.forEach(card => {
-      const ok = !termo || card.dataset.search.includes(termo);
-      card.classList.toggle('d-none', !ok);
-      if(ok) visiveis++;
-    });
-    sem.classList.toggle('d-none', visiveis !== 0);
-  }
-
-  document.querySelectorAll('.recurso-check').forEach(check => {
-    check.addEventListener('change', () => {
-      const qty = check.closest('.resource-card').querySelector('.quantidade-item');
-      qty.disabled = !check.checked;
-      if(check.checked && (!qty.value || Number(qty.value) <= 0)) qty.value = '1';
-    });
-  });
-
-  marcarTodos.addEventListener('click', () => {
-    const cards = cardsAtuais().filter(card => !card.classList.contains('d-none'));
-    const marcar = cards.some(card => !card.querySelector('.recurso-check').checked);
-    cards.forEach(card => {
-      const check = card.querySelector('.recurso-check');
-      const qty = card.querySelector('.quantidade-item');
-      check.checked = marcar;
-      qty.disabled = !marcar;
-      if(marcar && (!qty.value || Number(qty.value) <= 0)) qty.value = '1';
-    });
-    marcarTodos.textContent = marcar ? 'Desmarcar todos' : 'Marcar todos';
-  });
-
-  adicionarManual.addEventListener('click', criarLinhaManual);
-  itensManuais.addEventListener('click', (event) => {
-    const btn = event.target.closest('.remover-manual');
-    if(btn) btn.closest('.item-manual').remove();
-  });
-
-  busca.addEventListener('input', filtrar);
-  tipo.addEventListener('change', atualizar);
-  atualizar();
-})();
-</script>
-{% endblock %}
+{% block scripts %}<script>
+(function(){const tipo=document.getElementById('tipoRecurso'),mat=document.getElementById('listaMateriais'),fer=document.getElementById('listaFerramentas'),cat=document.getElementById('blocoCatalogo'),out=document.getElementById('blocoOutro'),busca=document.getElementById('buscarRecurso'),todos=document.getElementById('marcarTodos'),titulo=document.getElementById('tituloRecursos'),sem=document.getElementById('semResultados'),manual=document.getElementById('itensManuais');
+function atuais(){return [...document.querySelectorAll('.resource-card[data-tipo="'+tipo.value+'"]')];}
+function unidades(){document.querySelectorAll('.item-manual').forEach(l=>{const s=l.querySelector('select[name="custom_unidade[]"]');if(tipo.value==='ferramenta'){s.value='un';s.disabled=true;}else{s.disabled=false;}});}
+function filtrar(){if(tipo.value==='outro')return;const t=(busca.value||'').trim().toLowerCase();let n=0;atuais().forEach(c=>{const ok=!t||c.dataset.search.includes(t);c.classList.toggle('d-none',!ok);if(ok)n++;});sem.classList.toggle('d-none',n>0);}
+function atualizar(){const o=tipo.value==='outro';cat.classList.toggle('d-none',o);out.classList.toggle('d-none',!o);mat.classList.toggle('d-none',tipo.value!=='material');fer.classList.toggle('d-none',tipo.value!=='ferramenta');titulo.textContent=tipo.value==='material'?'Materiais para comprar':'Ferramentas para comprar';busca.placeholder=tipo.value==='material'?'Pesquisar material...':'Pesquisar ferramenta...';todos.classList.toggle('d-none',o);unidades();filtrar();}
+document.querySelectorAll('.recurso-check').forEach(c=>c.addEventListener('change',()=>{const q=c.closest('.resource-card').querySelector('.quantidade-item');if(c.checked&&(!q.value||Number(q.value)<=0))q.value='1';}));
+todos.addEventListener('click',()=>{const cards=atuais().filter(c=>!c.classList.contains('d-none'));const marcar=cards.some(c=>!c.querySelector('.recurso-check').checked);cards.forEach(c=>{c.querySelector('.recurso-check').checked=marcar;if(marcar)c.querySelector('.quantidade-item').value='1';});todos.textContent=marcar?'Desmarcar todos':'Marcar todos';});
+document.getElementById('adicionarManual').addEventListener('click',()=>{const l=document.querySelector('.item-manual').cloneNode(true);l.querySelectorAll('input').forEach(i=>i.value='');l.querySelector('select').value='un';l.querySelector('.remover-manual').disabled=false;manual.appendChild(l);unidades();});
+manual.addEventListener('click',e=>{const b=e.target.closest('.remover-manual');if(b&&document.querySelectorAll('.item-manual').length>1)b.closest('.item-manual').remove();});
+busca.addEventListener('input',filtrar);tipo.addEventListener('change',atualizar);document.getElementById('formSolicitacao').addEventListener('submit',e=>{if(tipo.value==='outro')return;const selecionado=document.querySelectorAll('.recurso-check:checked').length;const manuais=[...document.querySelectorAll('input[name="custom_nome[]"]')].filter(x=>x.value.trim()).length;if(!selecionado&&!manuais){e.preventDefault();alert('Selecione pelo menos um item ou digite um item que não esteja no catálogo.');}});atualizar();})();
+</script>{% endblock %}
