@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Monitoramento — {{ empresa.nome }}{% endblock %}
+{% block title %}Administração da Empreiteira{% endblock %}
 
 {% block content %}
 
@@ -10,782 +10,458 @@
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
 
         <div>
+
             <div class="d-flex align-items-center gap-2 mb-2">
-                <a href="{{ url_for('admin_dashboard') }}"
-                   class="btn btn-outline-secondary btn-sm">
+
+                <a
+                    href="{{ url_for('admin_dashboard') }}"
+                    class="btn btn-outline-secondary btn-sm"
+                >
                     <i class="bi bi-arrow-left"></i>
                     Voltar
                 </a>
 
                 <span class="badge bg-primary">
-                    <i class="bi bi-eye"></i>
-                    Monitoramento
+                    <i class="bi bi-shield-lock"></i>
+                    Administração
                 </span>
+
             </div>
 
             <h2 class="fw-bold mb-1">
                 <i class="bi bi-building"></i>
-                {{ empresa.nome }}
+                {{ empresa.nome_fantasia }}
             </h2>
 
             <p class="text-muted mb-0">
-                Visão operacional da empreiteira
+                Cadastro e responsáveis da empreiteira
             </p>
+
         </div>
 
         <div>
+
             {% if empresa.ativo %}
+
                 <span class="badge bg-success fs-6 px-3 py-2">
                     <i class="bi bi-check-circle"></i>
                     Empresa ativa
                 </span>
+
             {% else %}
+
                 <span class="badge bg-danger fs-6 px-3 py-2">
                     <i class="bi bi-slash-circle"></i>
                     Empresa bloqueada
                 </span>
+
             {% endif %}
+
         </div>
 
     </div>
 
 
-    <!-- AVISO DE SEPARAÇÃO -->
-    <div class="alert alert-info border-0 shadow-sm mb-4">
+    <!-- AVISO DE PRIVACIDADE -->
+    <div class="alert alert-success border-0 shadow-sm mb-4">
+
         <div class="d-flex gap-3 align-items-start">
-            <i class="bi bi-info-circle-fill fs-4"></i>
+
+            <i class="bi bi-shield-check-fill fs-3"></i>
 
             <div>
-                <strong>Modo de monitoramento</strong>
+
+                <strong>Área administrativa da plataforma</strong>
 
                 <div class="small mt-1">
-                    O ADM Geral pode acompanhar os dados desta empreiteira,
-                    mas as operações do dia a dia são realizadas pelo
-                    <strong>ADM da própria empreiteira</strong>.
+
+                    O ADM Geral administra somente o cadastro da
+                    empreiteira e seus responsáveis administrativos.
+
+                    Os dados operacionais da empresa são privados e
+                    ficam disponíveis exclusivamente para os usuários
+                    autorizados da própria empreiteira.
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
 
-    <!-- INFORMAÇÕES DA EMPRESA -->
+    <!-- DADOS DA EMPRESA -->
     <div class="card border-0 shadow-sm mb-4">
 
         <div class="card-header bg-white py-3">
+
             <h5 class="mb-0 fw-bold">
                 <i class="bi bi-building"></i>
-                Informações da empreiteira
+                Dados cadastrais
             </h5>
+
         </div>
 
         <div class="card-body">
 
-            <div class="row g-3">
+            <div class="row g-4">
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="small text-muted">
-                        Empresa
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
+                        Razão social
                     </div>
 
                     <div class="fw-semibold">
-                        {{ empresa.nome }}
+                        {{ empresa.razao_social }}
                     </div>
+
                 </div>
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="small text-muted">
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
+                        Nome fantasia
+                    </div>
+
+                    <div class="fw-semibold">
+                        {{ empresa.nome_fantasia }}
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
                         CNPJ
                     </div>
 
                     <div class="fw-semibold">
                         {{ empresa.cnpj or 'Não informado' }}
                     </div>
+
                 </div>
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="small text-muted">
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
                         Telefone
                     </div>
 
                     <div class="fw-semibold">
                         {{ empresa.telefone or 'Não informado' }}
                     </div>
+
                 </div>
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="small text-muted">
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
                         E-mail
                     </div>
 
                     <div class="fw-semibold">
                         {{ empresa.email or 'Não informado' }}
                     </div>
+
                 </div>
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="small text-muted">
-                        Cidade
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
+                        Endereço
                     </div>
 
                     <div class="fw-semibold">
-                        {{ empresa.cidade or 'Não informada' }}
+                        {{ empresa.endereco or 'Não informado' }}
                     </div>
+
                 </div>
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="small text-muted">
-                        Status
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
+                        Situação
                     </div>
 
-                    <div>
-                        {% if empresa.ativo %}
-                            <span class="badge bg-success">
-                                Ativa
-                            </span>
+                    {% if empresa.ativo %}
+
+                        <span class="badge bg-success">
+                            Ativa
+                        </span>
+
+                    {% else %}
+
+                        <span class="badge bg-danger">
+                            Bloqueada
+                        </span>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <div class="small text-muted mb-1">
+                        Cadastro
+                    </div>
+
+                    <div class="fw-semibold">
+
+                        {% if empresa.criado_em %}
+
+                            {{ empresa.criado_em.strftime('%d/%m/%Y') }}
+
                         {% else %}
-                            <span class="badge bg-danger">
-                                Bloqueada
-                            </span>
+
+                            —
+
                         {% endif %}
+
                     </div>
+
                 </div>
 
             </div>
 
-        </div>
-    </div>
-
-
-    <!-- INDICADORES -->
-    <div class="row g-3 mb-4">
-
-        <div class="col-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="small text-muted">
-                                Obras
-                            </div>
-
-                            <div class="fs-3 fw-bold">
-                                {{ obras|length }}
-                            </div>
-                        </div>
-
-                        <div class="fs-2 text-primary">
-                            <i class="bi bi-buildings"></i>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-
-        <div class="col-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="small text-muted">
-                                Usuários
-                            </div>
-
-                            <div class="fs-3 fw-bold">
-                                {{ usuarios|length }}
-                            </div>
-                        </div>
-
-                        <div class="fs-2 text-success">
-                            <i class="bi bi-people"></i>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-
-        <div class="col-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="small text-muted">
-                                Materiais
-                            </div>
-
-                            <div class="fs-3 fw-bold">
-                                {{ materiais|length }}
-                            </div>
-                        </div>
-
-                        <div class="fs-2 text-warning">
-                            <i class="bi bi-box-seam"></i>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-
-        <div class="col-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="small text-muted">
-                                Ferramentas
-                            </div>
-
-                            <div class="fs-3 fw-bold">
-                                {{ ferramentas|length }}
-                            </div>
-                        </div>
-
-                        <div class="fs-2 text-secondary">
-                            <i class="bi bi-tools"></i>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
         </div>
 
     </div>
 
 
-    <!-- OBRAS -->
+    <!-- RESPONSÁVEIS ADMINISTRATIVOS -->
     <div class="card border-0 shadow-sm mb-4">
 
         <div class="card-header bg-white py-3">
+
             <div class="d-flex justify-content-between align-items-center">
 
-                <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-buildings"></i>
-                    Obras
-                </h5>
+                <div>
+
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-person-badge"></i>
+                        Responsáveis da empreiteira
+                    </h5>
+
+                    <small class="text-muted">
+                        Somente administradores autorizados da empresa
+                    </small>
+
+                </div>
 
                 <span class="badge bg-primary">
-                    {{ obras|length }}
+
+                    {{ administradores|length }}
+
                 </span>
 
             </div>
+
         </div>
 
-        <div class="card-body p-0">
 
-            {% if obras %}
+        <div class="card-body">
 
-                <div class="table-responsive">
+            {% if administradores %}
 
-                    <table class="table table-hover align-middle mb-0">
+                <div class="row g-3">
 
-                        <thead class="table-light">
-                            <tr>
-                                <th>Obra</th>
-                                <th>Local</th>
-                                <th>Status</th>
-                                <th>Data</th>
-                            </tr>
-                        </thead>
+                    {% for administrador in administradores %}
 
-                        <tbody>
+                        <div class="col-md-6 col-xl-4">
 
-                            {% for obra in obras %}
+                            <div class="border rounded-3 p-3 h-100">
 
-                                <tr>
+                                <div class="d-flex align-items-start gap-3">
 
-                                    <td>
-                                        <div class="fw-semibold">
-                                            {{ obra.nome }}
+                                    <div
+                                        class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                                        style="width:48px;height:48px;"
+                                    >
+                                        <i class="bi bi-person-fill fs-5"></i>
+                                    </div>
+
+                                    <div class="flex-grow-1">
+
+                                        <div class="fw-bold">
+
+                                            {{ administrador.nome }}
+
                                         </div>
 
-                                        {% if obra.codigo %}
-                                            <small class="text-muted">
-                                                Código: {{ obra.codigo }}
-                                            </small>
-                                        {% endif %}
-                                    </td>
+                                        <div class="small text-muted">
 
-                                    <td>
-                                        {{ obra.endereco or 'Não informado' }}
-                                    </td>
+                                            @{{ administrador.usuario }}
 
-                                    <td>
-                                        {% if obra.finalizada %}
-                                            <span class="badge bg-secondary">
-                                                Finalizada
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-success">
-                                                Em andamento
-                                            </span>
-                                        {% endif %}
-                                    </td>
+                                        </div>
 
-                                    <td>
-                                        {% if obra.criado_em %}
-                                            {{ obra.criado_em.strftime('%d/%m/%Y') }}
-                                        {% else %}
-                                            —
-                                        {% endif %}
-                                    </td>
+                                        <div class="mt-2">
 
-                                </tr>
+                                            {% if administrador.ativo %}
 
-                            {% endfor %}
+                                                <span class="badge bg-success">
+                                                    Ativo
+                                                </span>
 
-                        </tbody>
+                                            {% else %}
 
-                    </table>
+                                                <span class="badge bg-danger">
+                                                    Inativo
+                                                </span>
+
+                                            {% endif %}
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    {% endfor %}
 
                 </div>
 
             {% else %}
 
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-building fs-1 d-block mb-3"></i>
-                    Nenhuma obra cadastrada.
+                <div class="text-center py-4">
+
+                    <i class="bi bi-person-plus fs-1 text-muted"></i>
+
+                    <p class="text-muted mt-3 mb-0">
+                        Nenhum administrador cadastrado para esta empreiteira.
+                    </p>
+
                 </div>
 
             {% endif %}
 
         </div>
+
     </div>
 
 
-    <!-- USUÁRIOS -->
+    <!-- AÇÕES ADMINISTRATIVAS -->
     <div class="card border-0 shadow-sm mb-4">
 
         <div class="card-header bg-white py-3">
-            <div class="d-flex justify-content-between align-items-center">
 
-                <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-people"></i>
-                    Usuários da empreiteira
-                </h5>
+            <h5 class="mb-0 fw-bold">
+                <i class="bi bi-gear"></i>
+                Administração
+            </h5>
 
-                <span class="badge bg-success">
-                    {{ usuarios|length }}
-                </span>
+        </div>
+
+        <div class="card-body">
+
+            <div class="row g-3">
+
+                <div class="col-md-4">
+
+                    <a
+                        href="{{ url_for('editar_empresa', empresa_id=empresa.id) }}"
+                        class="btn btn-outline-primary w-100 py-3"
+                    >
+                        <i class="bi bi-pencil-square d-block fs-4 mb-1"></i>
+                        Editar empresa
+                    </a>
+
+                </div>
+
+
+                <div class="col-md-4">
+
+                    <a
+                        href="{{ url_for('novo_administrador_empresa', empresa_id=empresa.id) }}"
+                        class="btn btn-outline-success w-100 py-3"
+                    >
+                        <i class="bi bi-person-plus d-block fs-4 mb-1"></i>
+                        Adicionar administrador
+                    </a>
+
+                </div>
+
+
+                <div class="col-md-4">
+
+                    <form
+                        method="POST"
+                        action="{{ url_for('alternar_status_empresa', empresa_id=empresa.id) }}"
+                    >
+
+                        <button
+                            type="submit"
+                            class="btn btn-outline-warning w-100 py-3"
+                        >
+
+                            {% if empresa.ativo %}
+
+                                <i class="bi bi-pause-circle d-block fs-4 mb-1"></i>
+                                Bloquear empresa
+
+                            {% else %}
+
+                                <i class="bi bi-play-circle d-block fs-4 mb-1"></i>
+                                Ativar empresa
+
+                            {% endif %}
+
+                        </button>
+
+                    </form>
+
+                </div>
 
             </div>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% if usuarios %}
-
-                <div class="table-responsive">
-
-                    <table class="table table-hover align-middle mb-0">
-
-                        <thead class="table-light">
-                            <tr>
-                                <th>Usuário</th>
-                                <th>Nome</th>
-                                <th>Função</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for usuario in usuarios %}
-
-                                <tr>
-
-                                    <td>
-                                        <strong>
-                                            {{ usuario.username }}
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        {{ usuario.nome or '—' }}
-                                    </td>
-
-                                    <td>
-                                        {% if usuario.funcao %}
-                                            <span class="badge bg-light text-dark border">
-                                                {{ usuario.funcao|replace('_', ' ')|title }}
-                                            </span>
-                                        {% else %}
-                                            —
-                                        {% endif %}
-                                    </td>
-
-                                    <td>
-
-                                        {% if usuario.ativo %}
-                                            <span class="badge bg-success">
-                                                Ativo
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-danger">
-                                                Inativo
-                                            </span>
-                                        {% endif %}
-
-                                    </td>
-
-                                </tr>
-
-                            {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            {% else %}
-
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-person-x fs-1 d-block mb-3"></i>
-                    Nenhum usuário cadastrado.
-                </div>
-
-            {% endif %}
 
         </div>
+
     </div>
 
 
-    <!-- MATERIAIS -->
-    <div class="card border-0 shadow-sm mb-4">
+    <!-- PRIVACIDADE -->
+    <div class="card border-0 bg-light mb-4">
 
-        <div class="card-header bg-white py-3">
-            <div class="d-flex justify-content-between align-items-center">
+        <div class="card-body">
 
-                <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-box-seam"></i>
-                    Materiais cadastrados
-                </h5>
+            <div class="d-flex gap-3">
 
-                <span class="badge bg-warning text-dark">
-                    {{ materiais|length }}
-                </span>
+                <i class="bi bi-lock-fill fs-4 text-primary"></i>
+
+                <div>
+
+                    <strong>Privacidade dos dados operacionais</strong>
+
+                    <p class="mb-0 small text-muted mt-1">
+
+                        O ADM Geral não possui acesso a funcionários,
+                        obras, estoque, materiais, ferramentas, compras
+                        ou solicitações desta empreiteira.
+
+                        Esses dados pertencem à operação da empresa e
+                        são administrados pelos seus próprios usuários
+                        autorizados.
+
+                    </p>
+
+                </div>
 
             </div>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% if materiais %}
-
-                <div class="table-responsive">
-
-                    <table class="table table-hover align-middle mb-0">
-
-                        <thead class="table-light">
-                            <tr>
-                                <th>Material</th>
-                                <th>Categoria</th>
-                                <th>Unidade</th>
-                                <th>Estoque</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for material in materiais %}
-
-                                <tr>
-
-                                    <td>
-                                        <strong>
-                                            {{ material.nome }}
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        {{ material.categoria or '—' }}
-                                    </td>
-
-                                    <td>
-                                        {{ material.unidade or '—' }}
-                                    </td>
-
-                                    <td>
-                                        <strong>
-                                            {{ material.quantidade_estoque or 0 }}
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        {% if material.ativo %}
-                                            <span class="badge bg-success">
-                                                Ativo
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">
-                                                Inativo
-                                            </span>
-                                        {% endif %}
-                                    </td>
-
-                                </tr>
-
-                            {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            {% else %}
-
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-box fs-1 d-block mb-3"></i>
-                    Nenhum material cadastrado.
-                </div>
-
-            {% endif %}
 
         </div>
-    </div>
 
-
-    <!-- FERRAMENTAS -->
-    <div class="card border-0 shadow-sm mb-4">
-
-        <div class="card-header bg-white py-3">
-            <div class="d-flex justify-content-between align-items-center">
-
-                <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-tools"></i>
-                    Ferramentas cadastradas
-                </h5>
-
-                <span class="badge bg-secondary">
-                    {{ ferramentas|length }}
-                </span>
-
-            </div>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% if ferramentas %}
-
-                <div class="table-responsive">
-
-                    <table class="table table-hover align-middle mb-0">
-
-                        <thead class="table-light">
-                            <tr>
-                                <th>Ferramenta</th>
-                                <th>Categoria</th>
-                                <th>Unidade</th>
-                                <th>Estoque</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for ferramenta in ferramentas %}
-
-                                <tr>
-
-                                    <td>
-                                        <strong>
-                                            {{ ferramenta.nome }}
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        {{ ferramenta.categoria or '—' }}
-                                    </td>
-
-                                    <td>
-                                        {{ ferramenta.unidade or '—' }}
-                                    </td>
-
-                                    <td>
-                                        <strong>
-                                            {{ ferramenta.quantidade_estoque or 0 }}
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        {% if ferramenta.ativo %}
-                                            <span class="badge bg-success">
-                                                Ativa
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">
-                                                Inativa
-                                            </span>
-                                        {% endif %}
-                                    </td>
-
-                                </tr>
-
-                            {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            {% else %}
-
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-tools fs-1 d-block mb-3"></i>
-                    Nenhuma ferramenta cadastrada.
-                </div>
-
-            {% endif %}
-
-        </div>
-    </div>
-
-
-    <!-- SOLICITAÇÕES -->
-    <div class="card border-0 shadow-sm mb-4">
-
-        <div class="card-header bg-white py-3">
-            <div class="d-flex justify-content-between align-items-center">
-
-                <h5 class="mb-0 fw-bold">
-                    <i class="bi bi-clipboard-check"></i>
-                    Solicitações
-                </h5>
-
-                <span class="badge bg-primary">
-                    {{ solicitacoes|length }}
-                </span>
-
-            </div>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% if solicitacoes %}
-
-                <div class="table-responsive">
-
-                    <table class="table table-hover align-middle mb-0">
-
-                        <thead class="table-light">
-                            <tr>
-                                <th>Recurso</th>
-                                <th>Tipo</th>
-                                <th>Obra</th>
-                                <th>Quantidade</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for solicitacao in solicitacoes %}
-
-                                <tr>
-
-                                    <td>
-                                        <strong>
-                                            {{ solicitacao.recurso_nome or solicitacao.material_nome or '—' }}
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        {% if solicitacao.tipo_recurso %}
-                                            <span class="badge bg-light text-dark border">
-                                                {{ solicitacao.tipo_recurso|title }}
-                                            </span>
-                                        {% else %}
-                                            Material
-                                        {% endif %}
-                                    </td>
-
-                                    <td>
-                                        {% if solicitacao.obra %}
-                                            {{ solicitacao.obra.nome }}
-                                        {% else %}
-                                            —
-                                        {% endif %}
-                                    </td>
-
-                                    <td>
-                                        {{ solicitacao.quantidade or 0 }}
-                                    </td>
-
-                                    <td>
-
-                                        {% if solicitacao.status == 'pendente' %}
-
-                                            <span class="badge bg-warning text-dark">
-                                                Pendente
-                                            </span>
-
-                                        {% elif solicitacao.status == 'comprado' %}
-
-                                            <span class="badge bg-info text-dark">
-                                                Comprado
-                                            </span>
-
-                                        {% elif solicitacao.status == 'confirmado' %}
-
-                                            <span class="badge bg-success">
-                                                Confirmado
-                                            </span>
-
-                                        {% elif solicitacao.status == 'cancelado' %}
-
-                                            <span class="badge bg-danger">
-                                                Cancelado
-                                            </span>
-
-                                        {% else %}
-
-                                            <span class="badge bg-secondary">
-                                                {{ solicitacao.status or '—' }}
-                                            </span>
-
-                                        {% endif %}
-
-                                    </td>
-
-                                </tr>
-
-                            {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            {% else %}
-
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-clipboard-x fs-1 d-block mb-3"></i>
-                    Nenhuma solicitação registrada.
-                </div>
-
-            {% endif %}
-
-        </div>
-    </div>
-
-
-    <!-- RODAPÉ DO MONITORAMENTO -->
-    <div class="text-center text-muted small py-3">
-        <i class="bi bi-shield-check"></i>
-        Dados exibidos em modo de monitoramento do ADM Geral.
     </div>
 
 </div>
