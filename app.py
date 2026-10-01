@@ -1156,18 +1156,38 @@ def _coluna_existe(inspector, tabela, coluna):
 
 
 def inicializar_banco():
-    """Cria as tabelas e adiciona colunas novas sem apagar dados existentes."""
+    """Cria o banco e aplica migrações compatíveis sem apagar dados existentes."""
 
     db.create_all()
 
     inspector = inspect(db.engine)
 
+    # db.create_all() não altera tabelas que já existem.
+    # Por isso mantemos aqui as colunas que foram adicionadas ao longo
+    # das versões do sistema, inclusive campos antigos que podem faltar
+    # em bancos criados por versões anteriores.
     alteracoes = {
+        "empresas": {
+            "criado_em": "TIMESTAMP",
+        },
+        "usuarios": {
+            "empresa_id": "INTEGER",
+            "criado_em": "TIMESTAMP",
+        },
+        "obras": {
+            "criado_em": "TIMESTAMP",
+        },
+        "usuario_obras": {
+            "funcao_na_obra": "VARCHAR(80) DEFAULT 'funcionario'",
+            "criado_em": "TIMESTAMP",
+        },
         "materiais": {
             "empresa_id": "INTEGER",
+            "criado_em": "TIMESTAMP",
         },
         "ferramentas": {
             "empresa_id": "INTEGER",
+            "criado_em": "TIMESTAMP",
         },
         "solicitacoes": {
             "material_id": "INTEGER",
@@ -1198,6 +1218,12 @@ def inicializar_banco():
                 with db.engine.begin() as conn:
                     conn.execute(text(sql))
 
+                logging.info(
+                    "Coluna adicionada automaticamente: %s.%s",
+                    tabela,
+                    coluna,
+                )
+
             except Exception:
                 logging.exception(
                     "Falha ao adicionar coluna %s.%s",
@@ -1208,9 +1234,13 @@ def inicializar_banco():
 
             inspector = inspect(db.engine)
 
-    # Garante valor válido para registros antigos.
-    if "solicitacoes" in inspector.get_table_names():
-        try:
+    # Valores seguros para registros antigos.
+    try:
+        tabelas = set(inspector.get_table_names())
+
+        if "solicitacoes" in tabelas and _coluna_existe(
+            inspector, "solicitacoes", "tipo_recurso"
+        ):
             with db.engine.begin() as conn:
                 conn.execute(
                     text(
@@ -1220,11 +1250,49 @@ def inicializar_banco():
                         "OR tipo_recurso = ''"
                     )
                 )
-        except Exception:
-            logging.exception(
-                "Falha ao normalizar tipo_recurso das solicitações"
-            )
-            raise
+
+        if "usuario_obras" in tabelas and _coluna_existe(
+            inspector, "usuario_obras", "funcao_na_obra"
+        ):
+            with db.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE usuario_obras "
+                        "SET funcao_na_obra = 'funcionario' "
+                        "WHERE funcao_na_obra IS NULL "
+                        "OR funcao_na_obra = ''"
+                    )
+                )
+
+    except Exception:
+        logging.exception(
+            "Falha ao normalizar dados de compatibilidade do banco."
+        )
+        raise
+
+    # Garante que exista um ADM Geral quando o banco ainda não possui um.
+    # As credenciais vêm exclusivamente das variáveis do Render.
+    admin_usuario = normalizar_usuario(
+        os.getenv("ADMIN_USER", "admin")
+    )
+    admin_senha = os.getenv("ADMIN_PASSWORD", "admin123")
+
+    admin = Usuario.query.filter_by(
+        usuario=admin_usuario
+    ).first()
+
+    if not admin:
+        admin = Usuario(
+            nome="Administrador Geral",
+            usuario=admin_usuario,
+            funcao="adm",
+            ativo=True,
+            empresa_id=None,
+        )
+        admin.definir_senha(admin_senha)
+        db.session.add(admin)
+        db.session.commit()
+        logging.info("ADM Geral criado durante a inicialização do banco.")
 
 
 @app.before_request
